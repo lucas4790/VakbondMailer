@@ -41,10 +41,29 @@ dotnet test
 4. **Verstuur naar iedereen**: na bevestiging worden de mails één voor één verstuurd via Outlook.
    Na afloop staat er een `verzendrapport_*.csv` naast je brondbestand met per ontvanger de status.
 
-## Publiceren als los .exe-bestand (voor iemand zonder .NET geïnstalleerd)
+## Uitgeven
+
+Een nieuwe versie uitbrengen gaat via een tag; GitHub Actions bouwt en publiceert dan de release:
 
 ```powershell
-dotnet publish src\VakbondMailer -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
-De .exe staat daarna in `src\VakbondMailer\bin\Release\net8.0-windows\win-x64\publish\`.
+Zelf een uitgave-map maken (zelfstandige .exe plus handleiding, sjablonen en voorbeeldlijst):
+
+```powershell
+.\scripts\Maak-Uitgave.ps1
+```
+
+Let op: de .exe werkt niet los — alle bestanden uit die map moeten bij elkaar blijven.
+
+## Scripts
+
+| Script | Waarvoor |
+|---|---|
+| `scripts\Maak-Uitgave.ps1` | Bouwt de uitgave-map, optioneel meteen als zip (`-ZipPath`). Wordt ook door de workflow gebruikt. |
+| `scripts\Maak-Screenshot.ps1` | Legt het venster vast, om een wijziging visueel te controleren. Start de app met `VAKBONDMAILER_SOFTWARE_RENDERING=1` als een gewone schermopname zwart blijft (machine zonder actieve schermsessie). |
+
+Het app-icoon `src\VakbondMailer\app.ico` is eenmalig gegenereerd en staat in de repo; wil je het
+vervangen, zet er dan gewoon een ander `.ico`-bestand neer.

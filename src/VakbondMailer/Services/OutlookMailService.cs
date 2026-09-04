@@ -37,10 +37,14 @@ public sealed class OutlookMailService : IMailSender
 
     // Marshal.GetActiveObject bestaat alleen op .NET Framework; op .NET (Core) moet de
     // Running Object Table zelf via P/Invoke aangesproken worden.
+    // System32 expliciet als zoekpad: anders zou Windows eerst in de map van de app kijken,
+    // en kan een neergezette ole32.dll meeliften met het programma.
     [DllImport("ole32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid clsid);
 
     [DllImport("oleaut32.dll", PreserveSig = false)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static extern void GetActiveObject(ref Guid rclsid, IntPtr reserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
 
     /// <param name="accountName">

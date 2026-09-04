@@ -71,27 +71,12 @@ public static class BulkMailSender
             }
 
             var recipient = recipients[i];
-            var subject = TemplateRenderer.Render(options.SubjectTemplate, recipient, options.PlanningFields);
-            var body = ComposeBody(options, recipient);
+            var result = SendOne(sender, recipient, options);
 
-            SendResult result;
-            try
-            {
-                sender.SendMail(recipient.Email, subject, body, options.AccountName, options.IsHtml, options.AttachmentPaths);
-                result = new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true };
+            if (result.Success)
                 sentEmails.Add(recipient.Email);
-            }
-            catch (Exception ex)
-            {
-                result = new SendResult
-                {
-                    Email = recipient.Email,
-                    DisplayName = recipient.DisplayName,
-                    Success = false,
-                    Error = ex.Message,
-                };
+            else
                 failed.Add(recipient);
-            }
 
             results.Add(result);
             onProgress?.Invoke(new BulkSendProgress(i + 1, recipients.Count, recipient, result));
@@ -117,6 +102,32 @@ public static class BulkMailSender
             SentEmails = sentEmails,
             Cancelled = cancelled,
         };
+    }
+
+    /// <summary>
+    /// Eén mail. Een fout bij deze ontvanger mag de rest van de lijst niet tegenhouden, dus
+    /// die wordt hier opgevangen en als resultaat teruggegeven.
+    /// </summary>
+    private static SendResult SendOne(IMailSender sender, Recipient recipient, BulkSendOptions options)
+    {
+        try
+        {
+            var subject = TemplateRenderer.Render(options.SubjectTemplate, recipient, options.PlanningFields);
+            var body = ComposeBody(options, recipient);
+            sender.SendMail(recipient.Email, subject, body, options.AccountName, options.IsHtml, options.AttachmentPaths);
+
+            return new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true };
+        }
+        catch (Exception ex)
+        {
+            return new SendResult
+            {
+                Email = recipient.Email,
+                DisplayName = recipient.DisplayName,
+                Success = false,
+                Error = ex.Message,
+            };
+        }
     }
 
     public static string ComposeBody(BulkSendOptions options, Recipient recipient)

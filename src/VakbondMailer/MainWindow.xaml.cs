@@ -36,9 +36,23 @@ public partial class MainWindow : Window
     private string? SelectedAccountName =>
         AccountComboBox.SelectedItem is string name && name != DefaultAccountLabel ? name : null;
 
+    /// <summary>
+    /// Laat het venster meegroeien met het scherm: op een grote monitor hoeft er dan veel minder
+    /// gescrold te worden tussen de drie stappen. Wel begrensd, want de inhoud staat gecentreerd
+    /// en wordt van eindeloze breedte niet beter leesbaar.
+    /// </summary>
+    private void SizeToScreen()
+    {
+        var beschikbaar = SystemParameters.WorkArea;
+
+        Width = Math.Clamp(beschikbaar.Width * 0.6, MinWidth, 1500);
+        Height = Math.Clamp(beschikbaar.Height * 0.9, MinHeight, 1300);
+    }
+
     public MainWindow()
     {
         InitializeComponent();
+        SizeToScreen();
         _lastFocusedTemplateBox = BodyTextBox;
         LogListBox.ItemsSource = _log.Entries;
         AttachmentListControl.ItemsSource = _attachmentPaths;

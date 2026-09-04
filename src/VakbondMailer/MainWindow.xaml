@@ -2,9 +2,12 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Vakbond Mailer" Height="920" Width="1080" MinHeight="680" MinWidth="820"
+        WindowStartupLocation="CenterScreen"
         Background="{StaticResource PaperBrush}" Icon="app.ico">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="920" HorizontalAlignment="Center" Margin="28">
+        <!-- Stretch met een MaxWidth: de inhoud groeit mee met het venster tot een breedte die
+             nog prettig leest, en blijft daarboven gecentreerd staan. -->
+        <StackPanel MaxWidth="1100" HorizontalAlignment="Stretch" Margin="28">
 
             <!-- Masthead -->
             <Border BorderBrush="{StaticResource InkBrush}" BorderThickness="0,0,0,2" Padding="0,0,0,18" Margin="0,0,0,22">
@@ -79,9 +82,10 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="16"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="320"/>
                             <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <Button x:Name="ChooseFileButton" Grid.Column="0" Content="Bestand kiezen..." VerticalAlignment="Center" Click="ChooseFileButton_Click"/>
@@ -126,9 +130,10 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="320"/>
                                 <ColumnDefinition Width="16"/>
                                 <ColumnDefinition Width="240"/>
+                                <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
                             <Button x:Name="ChooseTemplateFolderButton" Grid.Column="0" Content="Map kiezen..." VerticalAlignment="Center" Click="ChooseTemplateFolderButton_Click"/>

@@ -14,6 +14,8 @@ public sealed class AppSettings
 /// </summary>
 public static class AppSettingsService
 {
+    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "VakbondMailer", "settings.json");
@@ -40,6 +42,6 @@ public static class AppSettingsService
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, Options));
     }
 }

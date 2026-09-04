@@ -18,6 +18,7 @@ public sealed record SendHistoryEntry(DateTime SentAt, string Subject, string Re
 public static class SendHistoryService
 {
     private static readonly TimeSpan KeepHistoryFor = TimeSpan.FromDays(90);
+    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
     public static string DefaultPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -52,7 +53,7 @@ public static class SendHistoryService
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(path, JsonSerializer.Serialize(pruned, new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(path, JsonSerializer.Serialize(pruned, Options));
     }
 
     /// <summary>

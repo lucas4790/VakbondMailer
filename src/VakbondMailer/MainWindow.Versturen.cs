@@ -139,15 +139,40 @@ public partial class MainWindow
 
     private async Task SendToRecipientsAsync(IReadOnlyList<Recipient> recipients)
     {
-        if (string.IsNullOrWhiteSpace(SubjectTextBox.Text) || string.IsNullOrWhiteSpace(BodyTextBox.Text))
+        if (!TryPrepareSend(out var options, out var senderEmail))
+            return;
+
+        if (!ConfirmSend(recipients, options, senderEmail))
+            return;
+
+        _sendCts = new CancellationTokenSource();
+        SetSendingState(true, canCancel: true);
+        SendProgressBar.Maximum = recipients.Count;
+        SendProgressBar.Value = 0;
+        _log.Clear();
+
+        // Bewust op de UI-thread (geen Task.Run): Outlook-COM-objecten zijn STA-gebonden.
+        var outcome = await BulkMailSender.SendAsync(
+            _outlookService, recipients, options, OnSendProgress, _sendCts.Token);
+
+        _sendCts?.Dispose();
+        _sendCts = null;
+        SetSendingState(false);
+
+        ReportOutcome(outcome, options, recipients.Count);
+    }
+
+    /// <summary>
+    /// Alles wat de gebruiker nog moet bevestigen voordat er ook maar één mail weggaat.
+    /// </summary>
+    private bool ConfirmSend(IReadOnlyList<Recipient> recipients, BulkSendOptions options, string senderEmail)
+    {
+        if (string.IsNullOrWhiteSpace(options.SubjectTemplate) || string.IsNullOrWhiteSpace(options.BodyTemplate))
         {
             MessageBox.Show(this, "Vul eerst een onderwerp en tekst in.", "Sjabloon leeg",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            return false;
         }
-
-        if (!TryPrepareSend(out var options, out var senderEmail))
-            return;
 
         var unknownPlaceholders = FindUnknownPlaceholders();
         if (unknownPlaceholders.Count > 0)
@@ -157,10 +182,8 @@ public partial class MainWindow
                 $"{string.Join(", ", unknownPlaceholders.Select(u => $"{{{{{u}}}}}"))}.\n\nToch doorgaan?",
                 "Onbekende velden", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirmUnknown != MessageBoxResult.Yes)
-                return;
+                return false;
         }
-
-        var count = recipients.Count;
 
         var alreadySent = SendHistoryService.CountRecentlySent(
             SendHistoryService.DefaultPath,
@@ -172,36 +195,27 @@ public partial class MainWindow
         if (alreadySent > 0)
         {
             var confirmDuplicate = MessageBox.Show(this,
-                $"Deze mail is de afgelopen {SendSettings.DuplicateSendWindow.TotalDays:0} dagen al naar {alreadySent} van deze {count} ontvanger(s) gestuurd.\n\nToch (nogmaals) versturen?",
+                $"Deze mail is de afgelopen {SendSettings.DuplicateSendWindow.TotalDays:0} dagen al naar {alreadySent} van deze {recipients.Count} ontvanger(s) gestuurd.\n\nToch (nogmaals) versturen?",
                 "Mogelijk dubbel versturen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirmDuplicate != MessageBoxResult.Yes)
-                return;
+                return false;
         }
 
         var confirm = MessageBox.Show(this,
-            $"Weet je zeker dat je deze mail wilt versturen naar {count} ontvanger(s), vanaf {senderEmail}?",
+            $"Weet je zeker dat je deze mail wilt versturen naar {recipients.Count} ontvanger(s), vanaf {senderEmail}?",
             "Bevestig verzenden", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes)
-            return;
 
-        _sendCts = new CancellationTokenSource();
+        return confirm == MessageBoxResult.Yes;
+    }
 
-        SetSendingState(true, canCancel: true);
-        SendProgressBar.Maximum = count;
-        SendProgressBar.Value = 0;
-        _log.Clear();
-
-        // Bewust op de UI-thread (geen Task.Run): Outlook-COM-objecten zijn STA-gebonden.
-        var outcome = await BulkMailSender.SendAsync(
-            _outlookService, recipients, options, OnSendProgress, _sendCts.Token);
-
+    /// <summary>
+    /// Na afloop: wat mislukte klaarzetten voor een herkansing, de geschiedenis bijwerken, het
+    /// rapport wegschrijven en samenvatten wat er gebeurd is.
+    /// </summary>
+    private void ReportOutcome(BulkSendOutcome outcome, BulkSendOptions options, int count)
+    {
         if (outcome.Cancelled)
             Log($"Verzending gestopt door gebruiker na {outcome.Results.Count} van {count}.");
-
-        var results = outcome.Results;
-        var succeeded = results.Count(r => r.Success);
-        var failed = results.Count(r => !r.Success);
-        var cancelled = outcome.Cancelled;
 
         _lastFailedRecipients = outcome.Failed.ToList();
         RetryFailedButton.Content = $"Mislukte opnieuw ({outcome.Failed.Count})";
@@ -224,7 +238,7 @@ public partial class MainWindow
 
         try
         {
-            SendReportService.Write(reportPath, results);
+            SendReportService.Write(reportPath, outcome.Results);
             Log($"Rapport opgeslagen: {reportPath}");
         }
         catch (Exception ex)
@@ -232,14 +246,13 @@ public partial class MainWindow
             Log($"Kon rapport niet opslaan: {ex.Message}");
         }
 
-        _sendCts?.Dispose();
-        _sendCts = null;
-        SetSendingState(false);
-
-        var summary = cancelled
+        var succeeded = outcome.Results.Count(r => r.Success);
+        var failed = outcome.Results.Count(r => !r.Success);
+        var summary = outcome.Cancelled
             ? $"Gestopt. {succeeded} verstuurd, {failed} mislukt, rest overgeslagen.\nRapport: {reportPath}"
             : $"Klaar. {succeeded} verstuurd, {failed} mislukt.\nRapport: {reportPath}";
-        MessageBox.Show(this, summary, cancelled ? "Verzending gestopt" : "Verzenden voltooid",
+
+        MessageBox.Show(this, summary, outcome.Cancelled ? "Verzending gestopt" : "Verzenden voltooid",
             MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
