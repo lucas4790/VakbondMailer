@@ -188,17 +188,21 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var testRecipient = string.IsNullOrWhiteSpace(TestRecipientTextBox.Text)
+                ? myEmail
+                : TestRecipientTextBox.Text.Trim();
+
             var sampleRecipient = _imported?.Recipients.FirstOrDefault()
-                ?? new Recipient { Email = myEmail, Fields = new Dictionary<string, string>() };
+                ?? new Recipient { Email = testRecipient, Fields = new Dictionary<string, string>() };
 
             var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
             var body = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
 
-            _outlookService.SendMail(myEmail, $"[TEST] {subject}", body, accountName);
+            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName);
             await Task.Yield();
 
-            LogSend("Testmail (naar mezelf)", myEmail, true);
-            MessageBox.Show(this, $"Testmail verstuurd naar {myEmail}.", "Gelukt",
+            LogSend("Testmail", testRecipient, true);
+            MessageBox.Show(this, $"Testmail verstuurd naar {testRecipient}.", "Gelukt",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (OutlookNotAvailableException ex)
@@ -446,6 +450,7 @@ public partial class MainWindow : Window
         EmailColumnComboBox.IsEnabled = !sending;
         AccountComboBox.IsEnabled = !sending;
         RefreshAccountsButton.IsEnabled = !sending;
+        TestRecipientTextBox.IsEnabled = !sending;
     }
 
     private void Log(string message) => AddLogEntry(new LogEntry(NowStamp(), message, null, null));

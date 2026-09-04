@@ -1,0 +1,69 @@
+VAKBOND MAILER — HANDLEIDING
+=============================
+
+Wat is dit?
+-----------
+Met dit programma verstuur je één standaardmail naar een hele lijst mensen tegelijk, via je
+eigen Outlook. Elke mail wordt automatisch persoonlijk gemaakt (bijvoorbeeld met de voornaam
+van de ontvanger).
+
+Wat zit er in deze map?
+------------------------
+- VakbondMailer.exe          het programma zelf — dubbelklikken om te starten
+- Ledenlijst-voorbeeld.csv   een voorbeeldbestand: laat zien hoe je een ontvangerslijst aanlevert
+- Sjablonen\                 kant-en-klare standaardmails, direct te gebruiken of aan te passen
+- LEESMIJ.txt                dit bestand
+
+Voordat je begint
+------------------
+- Zorg dat de klassieke Outlook-app open staat en dat je bent ingelogd.
+  Let op: de nieuwe "Outlook"-app (uit de Microsoft Store) werkt hier NIET mee — gebruik de
+  gewone, klassieke Outlook-desktopapp.
+- Er kan alleen verstuurd worden vanaf een e-mailadres dat eindigt op @fnv.nl.
+
+Stap 1 — je ledenlijst maken
+------------------------------
+Open "Ledenlijst-voorbeeld.csv" in Excel en vervang de voorbeeldrijen door je eigen gegevens,
+of maak een nieuw Excel-bestand met in elk geval deze kolommen:
+
+    Voornaam    Achternaam    E-mail                       School
+    Anne        de Boer       anne.deboer@school.nl        De Vlinder
+
+Je mag zelf kolommen toevoegen of anders noemen (bijvoorbeeld "Vak" of "Afdeling") — je kunt
+elke kolomnaam later in de mailtekst gebruiken als {{Kolomnaam}}.
+
+Sla het bestand op als .csv (in Excel: Bestand > Opslaan als > CSV UTF-8) of laat het gewoon
+een .xlsx-bestand — beide werken.
+
+Stap 2 — het programma starten
+--------------------------------
+Dubbelklik op VakbondMailer.exe.
+
+Stap 3 — lijst inladen (importeren)
+-------------------------------------
+Klik op "Bestand kiezen..." en kies je ingevulde CSV- of Excel-bestand. Controleer of bij
+"E-mailkolom" de juiste kolom staat — de app raadt dit automatisch, maar check het even.
+
+Stap 4 — mail opstellen
+--------------------------
+Kies bovenin bij "Sjablonenmap" de map "Sjablonen" (uit deze map) en pik een kant-en-klare
+mail uit de lijst, of typ zelf een onderwerp en tekst. Klik op een veld-knop zoals
+{{Voornaam}} om die op de cursorpositie in te voegen.
+
+Stap 5 — account kiezen
+--------------------------
+Klik op "Accounts vernieuwen" en kies het @fnv.nl-account waarmee je wilt versturen.
+
+Stap 6 — testen
+------------------
+Klik op "Stuur testmail naar mezelf" en controleer of de mail er goed uitziet.
+
+Stap 7 — versturen
+---------------------
+Klik op "Verstuur naar iedereen" en bevestig. Na afloop staat er een verzendrapport (.csv)
+naast je brondbestand, met per ontvanger of de mail is aangekomen.
+
+Zelf een sjabloon toevoegen
+-----------------------------
+Stel een mail samen en klik op "Opslaan als nieuw sjabloon...". Sla hem op in de map
+"Sjablonen" (uit deze map), zodat hij de volgende keer meteen in de lijst staat.

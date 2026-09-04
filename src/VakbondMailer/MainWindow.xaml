@@ -203,8 +203,15 @@
                         </Grid>
                     </StackPanel>
 
+                    <StackPanel Margin="0,0,0,14">
+                        <TextBlock Text="TESTONTVANGER — LEEG = NAAR MEZELF" Style="{StaticResource FieldLabelText}"/>
+                        <Border Style="{StaticResource InputChrome}" Width="320" HorizontalAlignment="Left">
+                            <TextBox x:Name="TestRecipientTextBox" Style="{StaticResource BareTextBox}"/>
+                        </Border>
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <Button x:Name="SendTestButton" Content="Stuur testmail naar mezelf" Click="SendTestButton_Click"/>
+                        <Button x:Name="SendTestButton" Content="Stuur testmail" Click="SendTestButton_Click"/>
                         <Button x:Name="SendAllButton" Content="Verstuur naar iedereen" Style="{StaticResource PrimaryButton}" Click="SendAllButton_Click" Margin="10,0,0,0"/>
                     </StackPanel>
 
