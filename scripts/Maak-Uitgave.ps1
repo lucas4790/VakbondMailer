@@ -4,7 +4,10 @@
     (ledenlijst, sjablonen, handleiding) in één map die je zo aan de gebruiker kunt geven.
 #>
 param(
-    [string]$OutputDir = "dist\VakbondMailer"
+    [string]$OutputDir = "dist\VakbondMailer",
+
+    # Optioneel: maak er meteen een zip van om te delen (gebruikt de GitHub Actions-workflow).
+    [string]$ZipPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,7 +31,20 @@ Copy-Item (Join-Path $root "templates-voorbeeld\*.json") $sjablonenDest -Force
 
 Write-Host "3/3 Klaar."
 Write-Host ""
-Write-Host "Klaar. Uitgave staat in:"
+Write-Host "Uitgave staat in:"
 Write-Host "  $dest"
-Write-Host ""
-Write-Host "Zip deze map (rechtermuisknop > Verzenden naar > Gecomprimeerde map) om hem te delen."
+
+if ($ZipPath) {
+    $zipFullPath = if ([System.IO.Path]::IsPathRooted($ZipPath)) { $ZipPath } else { Join-Path $root $ZipPath }
+    $zipDirectory = Split-Path -Parent $zipFullPath
+    if ($zipDirectory) { New-Item -ItemType Directory -Force -Path $zipDirectory | Out-Null }
+
+    Compress-Archive -Path (Join-Path $dest "*") -DestinationPath $zipFullPath -Force
+    Write-Host "Zip staat in:"
+    Write-Host "  $zipFullPath"
+}
+else {
+    Write-Host ""
+    Write-Host "Zip deze map (rechtermuisknop > Verzenden naar > Gecomprimeerde map) om hem te delen,"
+    Write-Host "of draai dit script met -ZipPath 'dist\VakbondMailer.zip'."
+}
