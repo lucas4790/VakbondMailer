@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Bouwt VakbondMailer als zelfstandige .exe en zet die samen met de voorbeelddocumenten
-    (ledenlijst, sjablonen, handleiding) in één map die je zo aan Linda kunt geven.
+    (ledenlijst, sjablonen, handleiding) in één map die je zo aan de gebruiker kunt geven.
 #>
 param(
     [string]$OutputDir = "dist\VakbondMailer"
