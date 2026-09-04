@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CsvHelper;
@@ -51,6 +52,33 @@ public static partial class RecipientImportService
             h.Equals("mail", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Opent een CSV met de juiste codering: met BOM leest StreamReader die zelf, zonder BOM
+    /// proberen we strikt UTF-8 en vallen we terug op Latin1 — dat laatste is wat Excel schrijft
+    /// bij "CSV (gescheiden door lijstscheidingstekens)", waar accenten anders onleesbaar worden.
+    /// </summary>
+    private static StreamReader OpenCsvReader(string filePath)
+    {
+        var bytes = File.ReadAllBytes(filePath);
+
+        if (StartsWithBom(bytes))
+            return new StreamReader(new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+
+        try
+        {
+            new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);
+            return new StreamReader(new MemoryStream(bytes), new UTF8Encoding(false));
+        }
+        catch (DecoderFallbackException)
+        {
+            return new StreamReader(new MemoryStream(bytes), Encoding.Latin1);
+        }
+    }
+
+    private static bool StartsWithBom(byte[] bytes) =>
+        (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        || (bytes.Length >= 2 && ((bytes[0] == 0xFF && bytes[1] == 0xFE) || (bytes[0] == 0xFE && bytes[1] == 0xFF)));
+
     private static string GetExtension(string filePath) => Path.GetExtension(filePath).ToLowerInvariant();
 
     private static NotSupportedException NotSupported(string extension) =>
@@ -58,7 +86,7 @@ public static partial class RecipientImportService
 
     private static IReadOnlyList<string> ReadCsvHeaders(string filePath)
     {
-        using var reader = new StreamReader(filePath);
+        using var reader = OpenCsvReader(filePath);
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
         csv.Read();
         csv.ReadHeader();
@@ -107,7 +135,7 @@ public static partial class RecipientImportService
 
     private static ImportedRecipients ImportCsv(string filePath, string emailColumn)
     {
-        using var reader = new StreamReader(filePath);
+        using var reader = OpenCsvReader(filePath);
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
         csv.Read();
         csv.ReadHeader();
@@ -191,6 +219,8 @@ public static partial class RecipientImportService
             throw new ArgumentException($"Kolom '{emailColumn}' niet gevonden in het bestand.", nameof(emailColumn));
     }
 
-    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
+    // Komma's, puntkomma's en punthaken worden bewust geweigerd: Outlook ziet die als scheidingsteken
+    // tussen ontvangers, dus één slordige cel mag nooit stilletijd naar meerdere mensen mailen.
+    [GeneratedRegex(@"^[^@\s,;<>""]+@[^@\s,;<>""]+\.[^@\s,;<>""]+$")]
     private static partial Regex EmailPattern();
 }

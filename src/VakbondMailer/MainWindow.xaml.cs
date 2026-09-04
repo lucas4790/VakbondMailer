@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private bool _isSending;
     private bool _testRecipientIsCustom;
     private bool _suppressTestRecipientTracking;
+    private bool _accountsLoaded;
     private CancellationTokenSource? _sendCts;
 
     private string? SelectedAccountName =>
@@ -38,7 +39,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _lastFocusedTemplateBox = BodyTextBox;
-        LogItemsControl.ItemsSource = _logEntries;
+        LogListBox.ItemsSource = _logEntries;
         AttachmentListControl.ItemsSource = _attachmentPaths;
         UpdateMergedPreview();
 
@@ -64,6 +65,10 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() != true)
             return;
 
+        // Eerst de vorige lijst loslaten: als het inlezen hierna misgaat, mag er geen oude
+        // ledenlijst blijven staan waar je per ongeluk naartoe verstuurt.
+        ClearLoadedList();
+
         try
         {
             _currentFilePath = dialog.FileName;
@@ -81,9 +86,28 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            ClearLoadedList();
             MessageBox.Show(this, $"Kon het bestand niet lezen:\n{ex.Message}", "Fout bij inlezen",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    /// <summary>
+    /// Zet alles wat van de ingeladen ledenlijst afhangt terug op leeg, zodat er nooit een
+    /// half ingeladen of verouderde lijst achterblijft.
+    /// </summary>
+    private void ClearLoadedList()
+    {
+        _imported = null;
+        _currentFilePath = null;
+        PreviewDataGrid.ItemsSource = null;
+        EmailColumnComboBox.ItemsSource = null;
+        PlaceholderPanel.Children.Clear();
+        RecipientCountText.Text = "Geen lijst geladen";
+        FilePathText.Text = "Nog geen bestand geladen";
+        FilePathText.Foreground = (System.Windows.Media.Brush)FindResource("InkFaintBrush");
+        UpdateMergedPreview();
+        UpdatePlaceholderWarning();
     }
 
     private void EmailColumnComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -118,6 +142,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            // Ook hier: geen half/verouderd resultaat laten staan waar naartoe verstuurd kan worden.
+            _imported = null;
+            PreviewDataGrid.ItemsSource = null;
+            RecipientCountText.Text = "Geen lijst geladen";
+            UpdateMergedPreview();
+            UpdatePlaceholderWarning();
+
             MessageBox.Show(this, $"Kon de lijst niet inladen:\n{ex.Message}", "Fout bij inlezen",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -265,12 +296,22 @@ public partial class MainWindow : Window
             var sampleRecipient = GetPreviewRecipient()
                 ?? new Recipient { Email = testRecipient, Fields = new Dictionary<string, string>() };
 
+            var attachments = _attachmentPaths.ToList();
+            var missingAttachment = attachments.FirstOrDefault(path => !File.Exists(path));
+            if (missingAttachment is not null)
+            {
+                MessageBox.Show(this,
+                    $"Deze bijlage bestaat niet meer:\n{missingAttachment}\n\nVerwijder hem uit de lijst of kies het bestand opnieuw.",
+                    "Bijlage niet gevonden", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var isHtml = HtmlFormattingCheckBox.IsChecked == true;
             var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
             var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
             var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
 
-            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName, isHtml, _attachmentPaths.ToList());
+            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName, isHtml, attachments);
             await Task.Yield();
 
             LogSend("Testmail", testRecipient, true);
@@ -352,10 +393,24 @@ public partial class MainWindow : Window
         var isHtml = HtmlFormattingCheckBox.IsChecked == true;
         var attachments = _attachmentPaths.ToList();
 
+        var missingAttachment = attachments.FirstOrDefault(path => !File.Exists(path));
+        if (missingAttachment is not null)
+        {
+            MessageBox.Show(this,
+                $"Deze bijlage bestaat niet meer:\n{missingAttachment}\n\nVerwijder hem uit de lijst of kies het bestand opnieuw.",
+                "Bijlage niet gevonden", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        // Onderwerp en tekst één keer vastleggen: als er tijdens het verzenden nog in de
+        // velden getypt wordt, mogen de resterende mails daar niet door veranderen.
+        var subjectTemplate = SubjectTextBox.Text;
+        var bodyTemplate = BodyTextBox.Text;
+
         _sendCts = new CancellationTokenSource();
         var token = _sendCts.Token;
 
-        SetSendingState(true);
+        SetSendingState(true, canCancel: true);
         SendProgressBar.Maximum = count;
         SendProgressBar.Value = 0;
         _logEntries.Clear();
@@ -372,8 +427,8 @@ public partial class MainWindow : Window
             }
 
             var recipient = _imported.Recipients[i];
-            var subject = TemplateRenderer.Render(SubjectTextBox.Text, recipient);
-            var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, recipient);
+            var subject = TemplateRenderer.Render(subjectTemplate, recipient);
+            var renderedBody = TemplateRenderer.Render(bodyTemplate, recipient);
             var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
 
             try
@@ -567,6 +622,7 @@ public partial class MainWindow : Window
                 items.Add(DefaultAccountLabel);
             items.AddRange(fnvAccounts.Select(a => a.DisplayName));
 
+            _accountsLoaded = true;
             AccountComboBox.ItemsSource = items;
             AccountComboBox.SelectedIndex = items.Count > 0 ? 0 : -1;
 
@@ -601,7 +657,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void TryAutoFillTestRecipient()
     {
-        if (_testRecipientIsCustom)
+        // Pas ná "Accounts vernieuwen": anders zou het opvragen van het adres bij het opstarten
+        // van de app Outlook op de achtergrond opstarten, wat niemand verwacht.
+        if (_testRecipientIsCustom || !_accountsLoaded)
             return;
 
         try
@@ -626,7 +684,11 @@ public partial class MainWindow : Window
         _testRecipientIsCustom = !string.IsNullOrWhiteSpace(TestRecipientTextBox.Text);
     }
 
-    private void SetSendingState(bool sending)
+    /// <param name="canCancel">
+    /// Alleen bij een bulkverzending is er iets om af te breken; bij één testmail heeft een
+    /// stopknop geen effect en moet hij dus ook niet in beeld komen.
+    /// </param>
+    private void SetSendingState(bool sending, bool canCancel = false)
     {
         _isSending = sending;
         SendTestButton.IsEnabled = !sending;
@@ -640,7 +702,15 @@ public partial class MainWindow : Window
         HtmlFormattingCheckBox.IsEnabled = !sending;
         AddAttachmentButton.IsEnabled = !sending;
 
-        CancelSendButton.Visibility = sending ? Visibility.Visible : Visibility.Collapsed;
+        // Sjabloon vastzetten tijdens het verzenden, zodat wat je ziet ook is wat er de deur uitgaat.
+        SubjectTextBox.IsEnabled = !sending;
+        BodyTextBox.IsEnabled = !sending;
+        TemplateComboBox.IsEnabled = !sending;
+        ChooseTemplateFolderButton.IsEnabled = !sending;
+        SaveTemplateButton.IsEnabled = !sending;
+        PlaceholderPanel.IsEnabled = !sending;
+
+        CancelSendButton.Visibility = sending && canCancel ? Visibility.Visible : Visibility.Collapsed;
         CancelSendButton.IsEnabled = true;
         CancelSendButton.Content = "Stoppen";
     }
@@ -656,7 +726,7 @@ public partial class MainWindow : Window
     private void AddLogEntry(LogEntry entry)
     {
         _logEntries.Add(entry);
-        LogScrollViewer.ScrollToEnd();
+        LogListBox.ScrollIntoView(entry);
     }
 
     private static string NowStamp() => DateTime.Now.ToString("HH:mm:ss");

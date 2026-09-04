@@ -69,4 +69,25 @@ public class TemplateRendererTests
     {
         Assert.Empty(TemplateRenderer.ExtractPlaceholders("Geen velden hier."));
     }
+
+    [Fact]
+    public void Render_TreatsDollarSignsInValuesAsPlainText()
+    {
+        // Regex-vervanging mag "$1" in een celwaarde niet als groepsverwijzing opvatten.
+        var recipient = CreateRecipient(("Bedrag", "$1 per maand"));
+
+        var result = TemplateRenderer.Render("Contributie: {{Bedrag}}", recipient);
+
+        Assert.Equal("Contributie: $1 per maand", result);
+    }
+
+    [Fact]
+    public void Render_DoesNotRecurseIntoValuesThatLookLikePlaceholders()
+    {
+        var recipient = CreateRecipient(("Voornaam", "{{Achternaam}}"), ("Achternaam", "de Boer"));
+
+        var result = TemplateRenderer.Render("Beste {{Voornaam}}", recipient);
+
+        Assert.Equal("Beste {{Achternaam}}", result);
+    }
 }
