@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Broncode ophalen
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: CodeQL voorbereiden
         uses: github/codeql-action/init@v3
