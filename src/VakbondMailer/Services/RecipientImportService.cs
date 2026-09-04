@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CsvHelper;
 using VakbondMailer.Models;
@@ -12,9 +13,15 @@ public sealed class ImportedRecipients
     public required IReadOnlyList<string> Headers { get; init; }
 
     public required IReadOnlyList<Recipient> Recipients { get; init; }
+
+    /// <summary>
+    /// Rijen die zijn overgeslagen (geen/ongeldig e-mailadres, of een dubbel adres), als
+    /// leesbare tekst — zodat de gebruiker vóór het verzenden kan zien wat er is uitgesloten.
+    /// </summary>
+    public required IReadOnlyList<string> Warnings { get; init; }
 }
 
-public static class RecipientImportService
+public static partial class RecipientImportService
 {
     public static IReadOnlyList<string> ReadHeaders(string filePath)
     {
@@ -109,17 +116,17 @@ public static class RecipientImportService
         ValidateEmailColumn(headers, emailColumn);
 
         var recipients = new List<Recipient>();
+        var warnings = new List<string>();
+        var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rowNumber = 1;
         while (csv.Read())
         {
+            rowNumber++;
             var fields = headers.ToDictionary(h => h, h => csv.GetField(h)?.Trim() ?? string.Empty);
-            var email = fields[emailColumn];
-            if (string.IsNullOrWhiteSpace(email))
-                continue;
-
-            recipients.Add(new Recipient { Email = email, Fields = fields });
+            ProcessRow(fields, emailColumn, rowNumber, recipients, seenEmails, warnings);
         }
 
-        return new ImportedRecipients { Headers = headers, Recipients = recipients };
+        return new ImportedRecipients { Headers = headers, Recipients = recipients, Warnings = warnings };
     }
 
     private static ImportedRecipients ImportExcel(string filePath, string emailColumn)
@@ -130,6 +137,8 @@ public static class RecipientImportService
         ValidateEmailColumn(headers, emailColumn);
 
         var recipients = new List<Recipient>();
+        var warnings = new List<string>();
+        var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in worksheet.RowsUsed().Skip(1))
         {
             var fields = new Dictionary<string, string>();
@@ -138,19 +147,50 @@ public static class RecipientImportService
                 fields[headers[i]] = row.Cell(i + 1).GetString().Trim();
             }
 
-            var email = fields[emailColumn];
-            if (string.IsNullOrWhiteSpace(email))
-                continue;
-
-            recipients.Add(new Recipient { Email = email, Fields = fields });
+            ProcessRow(fields, emailColumn, row.RowNumber(), recipients, seenEmails, warnings);
         }
 
-        return new ImportedRecipients { Headers = headers, Recipients = recipients };
+        return new ImportedRecipients { Headers = headers, Recipients = recipients, Warnings = warnings };
     }
+
+    private static void ProcessRow(
+        Dictionary<string, string> fields,
+        string emailColumn,
+        int rowNumber,
+        List<Recipient> recipients,
+        HashSet<string> seenEmails,
+        List<string> warnings)
+    {
+        var email = fields[emailColumn];
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            warnings.Add($"Rij {rowNumber}: geen e-mailadres, overgeslagen.");
+            return;
+        }
+
+        if (!LooksLikeEmail(email))
+        {
+            warnings.Add($"Rij {rowNumber}: '{email}' lijkt geen geldig e-mailadres, overgeslagen.");
+            return;
+        }
+
+        if (!seenEmails.Add(email))
+        {
+            warnings.Add($"Rij {rowNumber}: '{email}' staat dubbel in de lijst, deze keer overgeslagen.");
+            return;
+        }
+
+        recipients.Add(new Recipient { Email = email, Fields = fields });
+    }
+
+    private static bool LooksLikeEmail(string email) => EmailPattern().IsMatch(email);
 
     private static void ValidateEmailColumn(IReadOnlyList<string> headers, string emailColumn)
     {
         if (!headers.Contains(emailColumn))
             throw new ArgumentException($"Kolom '{emailColumn}' niet gevonden in het bestand.", nameof(emailColumn));
     }
+
+    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
+    private static partial Regex EmailPattern();
 }

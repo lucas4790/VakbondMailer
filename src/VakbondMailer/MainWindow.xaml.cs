@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +20,7 @@ public partial class MainWindow : Window
 
     private readonly OutlookMailService _outlookService = new();
     private readonly ObservableCollection<LogEntry> _logEntries = new();
+    private readonly ObservableCollection<string> _attachmentPaths = new();
 
     private string? _currentFilePath;
     private string? _templatesFolder;
@@ -26,6 +29,7 @@ public partial class MainWindow : Window
     private bool _isSending;
     private bool _testRecipientIsCustom;
     private bool _suppressTestRecipientTracking;
+    private CancellationTokenSource? _sendCts;
 
     private string? SelectedAccountName =>
         AccountComboBox.SelectedItem is string name && name != DefaultAccountLabel ? name : null;
@@ -35,6 +39,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _lastFocusedTemplateBox = BodyTextBox;
         LogItemsControl.ItemsSource = _logEntries;
+        AttachmentListControl.ItemsSource = _attachmentPaths;
         UpdateMergedPreview();
 
         AccountComboBox.ItemsSource = new[] { DefaultAccountLabel };
@@ -98,7 +103,18 @@ public partial class MainWindow : Window
             PreviewDataGrid.ItemsSource = BuildPreviewTable(_imported).DefaultView;
             RecipientCountText.Text = $"{_imported.Recipients.Count} ontvanger(s) geladen";
 
+            foreach (var warning in _imported.Warnings)
+                Log(warning);
+
+            if (_imported.Warnings.Count > 0)
+            {
+                MessageBox.Show(this,
+                    $"Let op: {_imported.Warnings.Count} rij(en) zijn overgeslagen bij het inladen (geen, ongeldig of dubbel e-mailadres). Zie het logboek onderaan voor details.",
+                    "Rijen overgeslagen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
             UpdateMergedPreview();
+            UpdatePlaceholderWarning();
         }
         catch (Exception ex)
         {
@@ -153,20 +169,72 @@ public partial class MainWindow : Window
         target.Focus();
     }
 
-    private void Template_TextChanged(object sender, TextChangedEventArgs e) => UpdateMergedPreview();
+    private void Template_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateMergedPreview();
+        UpdatePlaceholderWarning();
+    }
+
+    private void PreviewDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateMergedPreview();
+
+    /// <summary>
+    /// Het momenteel geselecteerde rijtje in de lijst-preview, of anders de eerste ontvanger.
+    /// </summary>
+    private Recipient? GetPreviewRecipient()
+    {
+        if (_imported is null || _imported.Recipients.Count == 0)
+            return null;
+
+        var index = PreviewDataGrid.SelectedIndex;
+        return index >= 0 && index < _imported.Recipients.Count
+            ? _imported.Recipients[index]
+            : _imported.Recipients[0];
+    }
 
     private void UpdateMergedPreview()
     {
-        var sampleRecipient = _imported?.Recipients.FirstOrDefault();
-        if (sampleRecipient is null)
+        var recipient = GetPreviewRecipient();
+        if (recipient is null)
         {
+            PreviewRecipientLabel.Text = string.Empty;
             MergedPreviewSubject.Text = "(nog geen lijst geladen)";
             MergedPreviewBody.Text = "Laad een CSV of Excel-bestand om een echt voorbeeld te zien.";
             return;
         }
 
-        MergedPreviewSubject.Text = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
-        MergedPreviewBody.Text = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
+        PreviewRecipientLabel.Text = $"Voorbeeld van: {recipient.DisplayName} ({recipient.Email})";
+        MergedPreviewSubject.Text = TemplateRenderer.Render(SubjectTextBox.Text, recipient);
+        MergedPreviewBody.Text = TemplateRenderer.Render(BodyTextBox.Text, recipient);
+    }
+
+    /// <summary>
+    /// Placeholders die in onderwerp/tekst gebruikt worden maar geen kolom in de ledenlijst zijn
+    /// (bv. een tikfout), zodat die niet stilletjes als letterlijke tekst verstuurd worden.
+    /// </summary>
+    private IReadOnlyList<string> FindUnknownPlaceholders()
+    {
+        if (_imported is null)
+            return Array.Empty<string>();
+
+        return TemplateRenderer.ExtractPlaceholders(SubjectTextBox.Text)
+            .Concat(TemplateRenderer.ExtractPlaceholders(BodyTextBox.Text))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(token => !_imported.Headers.Contains(token, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private void UpdatePlaceholderWarning()
+    {
+        var unknown = FindUnknownPlaceholders();
+        if (unknown.Count == 0)
+        {
+            PlaceholderWarningText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        PlaceholderWarningText.Text =
+            $"Onbekend veld: {string.Join(", ", unknown.Select(u => $"{{{{{u}}}}}"))} — komt niet voor als kolom in de ledenlijst.";
+        PlaceholderWarningText.Visibility = Visibility.Visible;
     }
 
     private async void SendTestButton_Click(object sender, RoutedEventArgs e)
@@ -194,13 +262,15 @@ public partial class MainWindow : Window
                 ? myEmail
                 : TestRecipientTextBox.Text.Trim();
 
-            var sampleRecipient = _imported?.Recipients.FirstOrDefault()
+            var sampleRecipient = GetPreviewRecipient()
                 ?? new Recipient { Email = testRecipient, Fields = new Dictionary<string, string>() };
 
+            var isHtml = HtmlFormattingCheckBox.IsChecked == true;
             var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
-            var body = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
+            var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
+            var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
 
-            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName);
+            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName, isHtml, _attachmentPaths.ToList());
             await Task.Yield();
 
             LogSend("Testmail", testRecipient, true);
@@ -260,6 +330,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        var unknownPlaceholders = FindUnknownPlaceholders();
+        if (unknownPlaceholders.Count > 0)
+        {
+            var confirmUnknown = MessageBox.Show(this,
+                $"Deze velden komen niet voor in je ledenlijst en blijven letterlijk in de mail staan: " +
+                $"{string.Join(", ", unknownPlaceholders.Select(u => $"{{{{{u}}}}}"))}.\n\nToch doorgaan?",
+                "Onbekende velden", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirmUnknown != MessageBoxResult.Yes)
+                return;
+        }
+
         var count = _imported.Recipients.Count;
         var confirm = MessageBox.Show(this,
             $"Weet je zeker dat je deze mail wilt versturen naar {count} ontvanger(s), vanaf {senderEmail}?",
@@ -267,23 +348,39 @@ public partial class MainWindow : Window
         if (confirm != MessageBoxResult.Yes)
             return;
 
+        var delay = TimeSpan.FromSeconds(ParseDelaySeconds(DelayTextBox.Text));
+        var isHtml = HtmlFormattingCheckBox.IsChecked == true;
+        var attachments = _attachmentPaths.ToList();
+
+        _sendCts = new CancellationTokenSource();
+        var token = _sendCts.Token;
+
         SetSendingState(true);
         SendProgressBar.Maximum = count;
         SendProgressBar.Value = 0;
         _logEntries.Clear();
 
         var results = new List<SendResult>();
+        var cancelled = false;
         for (var i = 0; i < _imported.Recipients.Count; i++)
         {
+            if (token.IsCancellationRequested)
+            {
+                cancelled = true;
+                Log($"Verzending gestopt door gebruiker na {i} van {count}.");
+                break;
+            }
+
             var recipient = _imported.Recipients[i];
             var subject = TemplateRenderer.Render(SubjectTextBox.Text, recipient);
-            var body = TemplateRenderer.Render(BodyTextBox.Text, recipient);
+            var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, recipient);
+            var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
 
             try
             {
                 // Bewust synchroon op de UI-thread: Outlook-COM-objecten zijn STA-gebonden,
                 // aanroepen vanaf een threadpool-thread (Task.Run) kan RPC_E_WRONG_THREAD geven.
-                _outlookService.SendMail(recipient.Email, subject, body, accountName);
+                _outlookService.SendMail(recipient.Email, subject, body, accountName, isHtml, attachments);
                 results.Add(new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true });
                 LogSend(recipient.DisplayName, recipient.Email, true);
             }
@@ -303,7 +400,18 @@ public partial class MainWindow : Window
             StatusText.Text = $"{i + 1} / {count} verwerkt";
 
             if (i < _imported.Recipients.Count - 1)
-                await Task.Delay(1000);
+            {
+                try
+                {
+                    await Task.Delay(delay, token);
+                }
+                catch (TaskCanceledException)
+                {
+                    cancelled = true;
+                    Log($"Verzending gestopt door gebruiker na {i + 1} van {count}.");
+                    break;
+                }
+            }
         }
 
         var succeeded = results.Count(r => r.Success);
@@ -322,10 +430,50 @@ public partial class MainWindow : Window
             Log($"Kon rapport niet opslaan: {ex.Message}");
         }
 
+        _sendCts?.Dispose();
+        _sendCts = null;
         SetSendingState(false);
-        MessageBox.Show(this,
-            $"Klaar. {succeeded} verstuurd, {failed} mislukt.\nRapport: {reportPath}",
-            "Verzenden voltooid", MessageBoxButton.OK, MessageBoxImage.Information);
+
+        var summary = cancelled
+            ? $"Gestopt. {succeeded} verstuurd, {failed} mislukt, rest overgeslagen.\nRapport: {reportPath}"
+            : $"Klaar. {succeeded} verstuurd, {failed} mislukt.\nRapport: {reportPath}";
+        MessageBox.Show(this, summary, cancelled ? "Verzending gestopt" : "Verzenden voltooid",
+            MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void CancelSendButton_Click(object sender, RoutedEventArgs e)
+    {
+        _sendCts?.Cancel();
+        CancelSendButton.IsEnabled = false;
+        CancelSendButton.Content = "Stoppen...";
+    }
+
+    private static double ParseDelaySeconds(string text)
+    {
+        var normalized = text.Trim().Replace(',', '.');
+        if (double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds >= 0)
+            return Math.Max(seconds, 0.2);
+
+        return 1;
+    }
+
+    private void AddAttachmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Multiselect = true, Filter = "Alle bestanden (*.*)|*.*" };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        foreach (var path in dialog.FileNames)
+        {
+            if (!_attachmentPaths.Contains(path))
+                _attachmentPaths.Add(path);
+        }
+    }
+
+    private void RemoveAttachmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string path })
+            _attachmentPaths.Remove(path);
     }
 
     private void ChooseTemplateFolderButton_Click(object sender, RoutedEventArgs e)
@@ -488,6 +636,13 @@ public partial class MainWindow : Window
         AccountComboBox.IsEnabled = !sending;
         RefreshAccountsButton.IsEnabled = !sending;
         TestRecipientTextBox.IsEnabled = !sending;
+        DelayTextBox.IsEnabled = !sending;
+        HtmlFormattingCheckBox.IsEnabled = !sending;
+        AddAttachmentButton.IsEnabled = !sending;
+
+        CancelSendButton.Visibility = sending ? Visibility.Visible : Visibility.Collapsed;
+        CancelSendButton.IsEnabled = true;
+        CancelSendButton.Content = "Stoppen";
     }
 
     private void Log(string message) => AddLogEntry(new LogEntry(NowStamp(), message, null, null));

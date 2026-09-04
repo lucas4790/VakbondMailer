@@ -55,4 +55,18 @@ public class TemplateRendererTests
 
         Assert.Equal("Beste Anne, namens afdeling Zorg.", result);
     }
+
+    [Fact]
+    public void ExtractPlaceholders_ReturnsUniqueFieldNames()
+    {
+        var result = TemplateRenderer.ExtractPlaceholders("Beste {{Voornaam}}, {{Voornaam}} van {{School}}.");
+
+        Assert.Equal(new[] { "Voornaam", "School" }, result);
+    }
+
+    [Fact]
+    public void ExtractPlaceholders_ReturnsEmptyForPlainText()
+    {
+        Assert.Empty(TemplateRenderer.ExtractPlaceholders("Geen velden hier."));
+    }
 }

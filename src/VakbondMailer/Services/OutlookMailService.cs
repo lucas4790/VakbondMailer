@@ -32,7 +32,15 @@ public sealed class OutlookMailService
     /// Weergavenaam van het Outlook-account waarmee verstuurd moet worden (uit <see cref="GetAccounts"/>).
     /// Bij null/leeg wordt Outlook's eigen standaardaccount gebruikt.
     /// </param>
-    public void SendMail(string toEmail, string subject, string body, string? accountName = null)
+    /// <param name="isHtml">Wanneer true wordt <paramref name="body"/> als HTML geïnterpreteerd (zie <see cref="SimpleHtmlFormatter"/>).</param>
+    /// <param name="attachmentPaths">Volledige bestandspaden van bijlagen om mee te sturen.</param>
+    public void SendMail(
+        string toEmail,
+        string subject,
+        string body,
+        string? accountName = null,
+        bool isHtml = false,
+        IReadOnlyList<string>? attachmentPaths = null)
     {
         dynamic outlookApp = GetOrCreateOutlookApplication();
         dynamic mailItem = outlookApp.CreateItem(OlMailItem);
@@ -40,7 +48,17 @@ public sealed class OutlookMailService
         {
             mailItem.To = toEmail;
             mailItem.Subject = subject;
-            mailItem.Body = body;
+
+            if (isHtml)
+                mailItem.HTMLBody = body;
+            else
+                mailItem.Body = body;
+
+            if (attachmentPaths is not null)
+            {
+                foreach (var path in attachmentPaths)
+                    mailItem.Attachments.Add(path);
+            }
 
             if (!string.IsNullOrWhiteSpace(accountName))
             {

@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Vakbond Mailer" Height="920" Width="1080" MinHeight="680" MinWidth="820"
-        Background="{StaticResource PaperBrush}">
+        Background="{StaticResource PaperBrush}" Icon="app.ico">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="920" HorizontalAlignment="Center" Margin="28">
 
@@ -99,7 +99,8 @@
                                   ColumnHeaderStyle="{StaticResource ModernColumnHeader}"
                                   CellStyle="{StaticResource ModernCell}"
                                   RowStyle="{StaticResource ModernRow}"
-                                  AlternationCount="2"
+                                  AlternationCount="2" SelectionMode="Single" SelectionUnit="FullRow"
+                                  SelectionChanged="PreviewDataGrid_SelectionChanged"
                                   MaxHeight="230" RowHeight="32"/>
                     </Border>
                 </StackPanel>
@@ -143,6 +144,8 @@
                     <StackPanel Margin="0,0,0,14">
                         <TextBlock Text="VELD INVOEGEN — KLIK OM TOE TE VOEGEN OP DE CURSORPOSITIE" Style="{StaticResource FieldLabelText}"/>
                         <WrapPanel x:Name="PlaceholderPanel"/>
+                        <TextBlock x:Name="PlaceholderWarningText" FontSize="12" Foreground="{StaticResource BadBrush}"
+                                   Visibility="Collapsed" TextWrapping="Wrap" Margin="0,6,0,0"/>
                     </StackPanel>
 
                     <Grid>
@@ -162,9 +165,10 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="LIVE VOORBEELD — EERSTE RIJ UIT DE LIJST" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="LIVE VOORBEELD — KLIK EEN RIJ HIERBOVEN OM TE WISSELEN" Style="{StaticResource FieldLabelText}"/>
                             <Border Background="{StaticResource PaperSunkenBrush}" CornerRadius="8" Padding="14" Height="200">
                                 <StackPanel>
+                                    <TextBlock x:Name="PreviewRecipientLabel" FontSize="11" Foreground="{StaticResource InkFaintBrush}" Margin="0,0,0,4"/>
                                     <TextBlock x:Name="MergedPreviewSubject" FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
                                     <Separator Margin="0,0,0,8" Opacity="0.4"/>
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -177,6 +181,31 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                         <Button x:Name="SaveTemplateButton" Content="Opslaan als nieuw sjabloon..." Style="{StaticResource GhostButton}" Click="SaveTemplateButton_Click"/>
+                        <CheckBox x:Name="HtmlFormattingCheckBox" Content="Opmaak herkennen: **vet**, *cursief*, links (HTML)"
+                                  VerticalAlignment="Center" Margin="20,0,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,12,0,0">
+                        <TextBlock Text="BIJLAGEN" Style="{StaticResource FieldLabelText}"/>
+                        <Button x:Name="AddAttachmentButton" Content="Bijlage toevoegen..." HorizontalAlignment="Left" Click="AddAttachmentButton_Click"/>
+                        <ItemsControl x:Name="AttachmentListControl" Margin="0,8,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource PaperSunkenBrush}" CornerRadius="6" Padding="8,5" Margin="0,0,6,6">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding}" FontSize="12" VerticalAlignment="Center"/>
+                                            <Button Content="✕" Style="{StaticResource GhostButton}" Padding="6,0" Margin="6,0,0,0"
+                                                    Click="RemoveAttachmentButton_Click" Tag="{Binding}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -203,16 +232,30 @@
                         </Grid>
                     </StackPanel>
 
-                    <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="TESTONTVANGER — STANDAARD HET VERZENDACCOUNT" Style="{StaticResource FieldLabelText}"/>
-                        <Border Style="{StaticResource InputChrome}" Width="320" HorizontalAlignment="Left">
-                            <TextBox x:Name="TestRecipientTextBox" Style="{StaticResource BareTextBox}" TextChanged="TestRecipientTextBox_TextChanged"/>
-                        </Border>
-                    </StackPanel>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="TESTONTVANGER — STANDAARD HET VERZENDACCOUNT" Style="{StaticResource FieldLabelText}"/>
+                            <Border Style="{StaticResource InputChrome}" Width="320" HorizontalAlignment="Left">
+                                <TextBox x:Name="TestRecipientTextBox" Style="{StaticResource BareTextBox}" TextChanged="TestRecipientTextBox_TextChanged"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="PAUZE TUSSEN MAILS (SEC.)" Style="{StaticResource FieldLabelText}"/>
+                            <Border Style="{StaticResource InputChrome}" Width="70">
+                                <TextBox x:Name="DelayTextBox" Style="{StaticResource BareTextBox}" Text="1" HorizontalContentAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <Button x:Name="SendTestButton" Content="Stuur testmail" Click="SendTestButton_Click"/>
                         <Button x:Name="SendAllButton" Content="Verstuur naar iedereen" Style="{StaticResource PrimaryButton}" Click="SendAllButton_Click" Margin="10,0,0,0"/>
+                        <Button x:Name="CancelSendButton" Content="Stoppen" Click="CancelSendButton_Click" Margin="10,0,0,0" Visibility="Collapsed"/>
                     </StackPanel>
 
                     <ProgressBar x:Name="SendProgressBar" Style="{StaticResource ThinProgressBar}" Margin="0,0,0,8"/>

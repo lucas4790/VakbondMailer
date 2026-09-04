@@ -29,6 +29,53 @@ public class RecipientImportServiceTests
             Assert.Equal(2, imported.Recipients.Count);
             Assert.Equal("anne@example.com", imported.Recipients[0].Email);
             Assert.Equal("carla@example.com", imported.Recipients[1].Email);
+            Assert.Single(imported.Warnings);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Import_Csv_SkipsInvalidEmailAndReportsWarning()
+    {
+        var path = CreateTempCsv(
+            "Voornaam,E-mail\n" +
+            "Anne,anne@example.com\n" +
+            "Bram,niet-een-adres\n");
+
+        try
+        {
+            var imported = RecipientImportService.Import(path, "E-mail");
+
+            Assert.Single(imported.Recipients);
+            Assert.Equal("anne@example.com", imported.Recipients[0].Email);
+            Assert.Single(imported.Warnings);
+            Assert.Contains("niet-een-adres", imported.Warnings[0]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Import_Csv_SkipsDuplicateEmailAndReportsWarning()
+    {
+        var path = CreateTempCsv(
+            "Voornaam,E-mail\n" +
+            "Anne,anne@example.com\n" +
+            "Anne (nogmaals),ANNE@example.com\n");
+
+        try
+        {
+            var imported = RecipientImportService.Import(path, "E-mail");
+
+            Assert.Single(imported.Recipients);
+            Assert.Equal("anne@example.com", imported.Recipients[0].Email);
+            Assert.Single(imported.Warnings);
+            Assert.Contains("dubbel", imported.Warnings[0]);
         }
         finally
         {
