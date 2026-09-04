@@ -17,6 +17,8 @@ public partial class MainWindow : Window
 {
     private const string DefaultAccountLabel = "Standaardaccount van Outlook";
     private const string RequiredEmailDomain = "@fnv.nl";
+    private const string SelectionColumnName = "Versturen";
+    private static readonly TimeSpan DuplicateSendWindow = TimeSpan.FromDays(14);
 
     private readonly OutlookMailService _outlookService = new();
     private readonly ObservableCollection<LogEntry> _logEntries = new();
@@ -31,6 +33,8 @@ public partial class MainWindow : Window
     private bool _suppressTestRecipientTracking;
     private bool _accountsLoaded;
     private CancellationTokenSource? _sendCts;
+    private DataTable? _previewTable;
+    private List<Recipient> _lastFailedRecipients = new();
 
     private string? SelectedAccountName =>
         AccountComboBox.SelectedItem is string name && name != DefaultAccountLabel ? name : null;
@@ -102,6 +106,9 @@ public partial class MainWindow : Window
     {
         _imported = null;
         _currentFilePath = null;
+        _previewTable = null;
+        _lastFailedRecipients = new List<Recipient>();
+        RetryFailedButton.Visibility = Visibility.Collapsed;
         PreviewDataGrid.ItemsSource = null;
         EmailColumnComboBox.ItemsSource = null;
         RenderPlaceholderChips(Array.Empty<string>()); // planningsvelden blijven wel bruikbaar
@@ -125,9 +132,17 @@ public partial class MainWindow : Window
         try
         {
             _imported = RecipientImportService.Import(_currentFilePath, emailColumn);
+            _lastFailedRecipients = new List<Recipient>();
+            RetryFailedButton.Visibility = Visibility.Collapsed;
 
-            PreviewDataGrid.ItemsSource = BuildPreviewTable(_imported).DefaultView;
-            RecipientCountText.Text = $"{_imported.Recipients.Count} ontvanger(s) geladen";
+            _previewTable = BuildPreviewTable(_imported);
+            _previewTable.ColumnChanged += (_, args) =>
+            {
+                if (args.Column?.ColumnName == SelectionColumnName)
+                    UpdateRecipientCount();
+            };
+            PreviewDataGrid.ItemsSource = _previewTable.DefaultView;
+            UpdateRecipientCount();
 
             foreach (var warning in _imported.Warnings)
                 Log(warning);
@@ -146,6 +161,7 @@ public partial class MainWindow : Window
         {
             // Ook hier: geen half/verouderd resultaat laten staan waar naartoe verstuurd kan worden.
             _imported = null;
+            _previewTable = null;
             PreviewDataGrid.ItemsSource = null;
             RecipientCountText.Text = "Geen lijst geladen";
             UpdateMergedPreview();
@@ -159,18 +175,90 @@ public partial class MainWindow : Window
     private static DataTable BuildPreviewTable(ImportedRecipients imported)
     {
         var table = new DataTable();
+        table.Columns.Add(SelectionColumnName, typeof(bool));
         foreach (var header in imported.Headers)
             table.Columns.Add(header);
 
         foreach (var recipient in imported.Recipients)
         {
             var row = table.NewRow();
+            row[SelectionColumnName] = true;
             foreach (var header in imported.Headers)
                 row[header] = recipient.Fields.TryGetValue(header, out var value) ? value : string.Empty;
             table.Rows.Add(row);
         }
 
         return table;
+    }
+
+    private void PreviewDataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
+    {
+        // Alleen het vinkje is bewerkbaar; de gegevens uit de ledenlijst blijven kijkwerk.
+        var isSelectionColumn = e.PropertyName == SelectionColumnName;
+        e.Column.IsReadOnly = !isSelectionColumn;
+
+        if (isSelectionColumn)
+        {
+            e.Column.Header = "✓";
+            e.Column.CanUserResize = false;
+        }
+    }
+
+    /// <summary>
+    /// De ontvangers met een vinkje. De tabel staat 1-op-1 in dezelfde volgorde als de
+    /// ingelezen lijst (sorteren staat daarom uit), dus rij-index = ontvanger-index.
+    /// </summary>
+    private IReadOnlyList<Recipient> GetSelectedRecipients()
+    {
+        if (_imported is null || _previewTable is null)
+            return Array.Empty<Recipient>();
+
+        return _imported.Recipients
+            .Where((_, index) => index < _previewTable.Rows.Count && _previewTable.Rows[index][SelectionColumnName] is true)
+            .ToList();
+    }
+
+    private void SetAllSelected(bool selected)
+    {
+        if (_previewTable is null)
+            return;
+
+        PreviewDataGrid.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true);
+        foreach (DataRow row in _previewTable.Rows)
+            row[SelectionColumnName] = selected;
+
+        UpdateRecipientCount();
+    }
+
+    private void SelectAllButton_Click(object sender, RoutedEventArgs e) => SetAllSelected(true);
+
+    private void SelectNoneButton_Click(object sender, RoutedEventArgs e) => SetAllSelected(false);
+
+    private void SelectOnly(IReadOnlyCollection<Recipient> recipients)
+    {
+        if (_imported is null || _previewTable is null)
+            return;
+
+        PreviewDataGrid.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true);
+        for (var index = 0; index < _previewTable.Rows.Count && index < _imported.Recipients.Count; index++)
+            _previewTable.Rows[index][SelectionColumnName] = recipients.Contains(_imported.Recipients[index]);
+
+        UpdateRecipientCount();
+    }
+
+    private void UpdateRecipientCount()
+    {
+        if (_imported is null)
+        {
+            RecipientCountText.Text = "Geen lijst geladen";
+            return;
+        }
+
+        var total = _imported.Recipients.Count;
+        var selected = GetSelectedRecipients().Count;
+        RecipientCountText.Text = selected == total
+            ? $"{total} ontvanger(s) geladen"
+            : $"{selected} van {total} geselecteerd";
     }
 
     private void RenderPlaceholderChips(IReadOnlyList<string> headers)
@@ -218,11 +306,28 @@ public partial class MainWindow : Window
         ProposalCalendar.SelectedDates.Clear();
 
         var month = SelectedMonth;
+        var lastDay = month.AddMonths(1).AddDays(-1);
         ProposalCalendar.DisplayDateStart = month;
-        ProposalCalendar.DisplayDateEnd = month.AddMonths(1).AddDays(-1);
+        ProposalCalendar.DisplayDateEnd = lastDay;
         ProposalCalendar.DisplayDate = month;
 
+        BlockOutDatesYouWouldNeverPropose(month, lastDay);
         UpdatePlanningSummary();
+    }
+
+    /// <summary>
+    /// Weekenden en dagen die al voorbij zijn kun je een docent niet voorstellen, dus die
+    /// zijn niet aan te klikken.
+    /// </summary>
+    private void BlockOutDatesYouWouldNeverPropose(DateTime firstDay, DateTime lastDay)
+    {
+        ProposalCalendar.BlackoutDates.Clear();
+
+        for (var day = firstDay; day <= lastDay; day = day.AddDays(1))
+        {
+            if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday || day.Date < DateTime.Today)
+                ProposalCalendar.BlackoutDates.Add(new CalendarDateRange(day));
+        }
     }
 
     private void ProposalCalendar_SelectedDatesChanged(object sender, SelectionChangedEventArgs e) => UpdatePlanningSummary();
@@ -408,6 +513,29 @@ public partial class MainWindow : Window
             return;
         }
 
+        var recipients = GetSelectedRecipients();
+        if (recipients.Count == 0)
+        {
+            MessageBox.Show(this, "Er staat geen enkele ontvanger aangevinkt in de lijst.", "Niemand geselecteerd",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        await SendToRecipientsAsync(recipients);
+    }
+
+    private async void RetryFailedButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isSending || _lastFailedRecipients.Count == 0)
+            return;
+
+        var failed = _lastFailedRecipients.ToList();
+        SelectOnly(failed);
+        await SendToRecipientsAsync(failed);
+    }
+
+    private async Task SendToRecipientsAsync(IReadOnlyList<Recipient> recipients)
+    {
         if (string.IsNullOrWhiteSpace(SubjectTextBox.Text) || string.IsNullOrWhiteSpace(BodyTextBox.Text))
         {
             MessageBox.Show(this, "Vul eerst een onderwerp en tekst in.", "Sjabloon leeg",
@@ -446,7 +574,25 @@ public partial class MainWindow : Window
                 return;
         }
 
-        var count = _imported.Recipients.Count;
+        var count = recipients.Count;
+        var subjectTemplateForHistory = SubjectTextBox.Text;
+
+        var alreadySent = SendHistoryService.CountRecentlySent(
+            SendHistoryService.DefaultPath,
+            subjectTemplateForHistory,
+            recipients.Select(r => r.Email),
+            DuplicateSendWindow,
+            DateTime.Now);
+
+        if (alreadySent > 0)
+        {
+            var confirmDuplicate = MessageBox.Show(this,
+                $"Deze mail is de afgelopen {DuplicateSendWindow.TotalDays:0} dagen al naar {alreadySent} van deze {count} ontvanger(s) gestuurd.\n\nToch (nogmaals) versturen?",
+                "Mogelijk dubbel versturen", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirmDuplicate != MessageBoxResult.Yes)
+                return;
+        }
+
         var confirm = MessageBox.Show(this,
             $"Weet je zeker dat je deze mail wilt versturen naar {count} ontvanger(s), vanaf {senderEmail}?",
             "Bevestig verzenden", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -481,8 +627,10 @@ public partial class MainWindow : Window
         _logEntries.Clear();
 
         var results = new List<SendResult>();
+        var failedRecipients = new List<Recipient>();
+        var sentEmails = new List<string>();
         var cancelled = false;
-        for (var i = 0; i < _imported.Recipients.Count; i++)
+        for (var i = 0; i < recipients.Count; i++)
         {
             if (token.IsCancellationRequested)
             {
@@ -491,7 +639,7 @@ public partial class MainWindow : Window
                 break;
             }
 
-            var recipient = _imported.Recipients[i];
+            var recipient = recipients[i];
             var subject = TemplateRenderer.Render(subjectTemplate, recipient, planning);
             var renderedBody = TemplateRenderer.Render(bodyTemplate, recipient, planning);
             var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
@@ -502,6 +650,7 @@ public partial class MainWindow : Window
                 // aanroepen vanaf een threadpool-thread (Task.Run) kan RPC_E_WRONG_THREAD geven.
                 _outlookService.SendMail(recipient.Email, subject, body, accountName, isHtml, attachments);
                 results.Add(new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true });
+                sentEmails.Add(recipient.Email);
                 LogSend(recipient.DisplayName, recipient.Email, true);
             }
             catch (Exception ex)
@@ -513,13 +662,14 @@ public partial class MainWindow : Window
                     Success = false,
                     Error = ex.Message,
                 });
+                failedRecipients.Add(recipient);
                 LogSend(recipient.DisplayName, recipient.Email, false, ex.Message);
             }
 
             SendProgressBar.Value = i + 1;
             StatusText.Text = $"{i + 1} / {count} verwerkt";
 
-            if (i < _imported.Recipients.Count - 1)
+            if (i < recipients.Count - 1)
             {
                 try
                 {
@@ -536,6 +686,22 @@ public partial class MainWindow : Window
 
         var succeeded = results.Count(r => r.Success);
         var failed = results.Count(r => !r.Success);
+
+        _lastFailedRecipients = failedRecipients;
+        RetryFailedButton.Content = $"Mislukte opnieuw ({failedRecipients.Count})";
+        RetryFailedButton.Visibility = failedRecipients.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (sentEmails.Count > 0)
+        {
+            try
+            {
+                SendHistoryService.Append(SendHistoryService.DefaultPath, subjectTemplateForHistory, sentEmails, DateTime.Now);
+            }
+            catch (Exception ex)
+            {
+                Log($"Kon verzendgeschiedenis niet bijwerken: {ex.Message}");
+            }
+        }
 
         var directory = Path.GetDirectoryName(_currentFilePath) ?? Environment.CurrentDirectory;
         var reportPath = Path.Combine(directory, $"verzendrapport_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
@@ -768,6 +934,11 @@ public partial class MainWindow : Window
         AddAttachmentButton.IsEnabled = !sending;
 
         // Sjabloon vastzetten tijdens het verzenden, zodat wat je ziet ook is wat er de deur uitgaat.
+        SelectAllButton.IsEnabled = !sending;
+        SelectNoneButton.IsEnabled = !sending;
+        RetryFailedButton.IsEnabled = !sending;
+        PreviewDataGrid.IsEnabled = !sending;
+
         SubjectTextBox.IsEnabled = !sending;
         BodyTextBox.IsEnabled = !sending;
         TemplateComboBox.IsEnabled = !sending;

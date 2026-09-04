@@ -47,6 +47,10 @@ Klik op "Bestand kiezen..." en kies je ingevulde CSV- of Excel-bestand. Controle
 Rijen zonder (geldig) e-mailadres of met een dubbel adres worden automatisch overgeslagen; je
 krijgt daar een melding van, met details in het logboek onderaan.
 
+Voor elke rij staat een vinkje: alleen aangevinkte docenten krijgen de mail. Zo stuur je een
+tweede ronde of een vergeten school na, zonder je bestand aan te passen. Met "Alles aan" en
+"Alles uit" zet je in één klik alles om.
+
 Klik in de tabel op een rij om het "Live voorbeeld" bij stap 4 voor die specifieke persoon te
 bekijken — handig om een paar mensen na elkaar te checken voordat je aan iedereen verstuurt.
 
@@ -94,6 +98,16 @@ klik dan op "Stoppen" om de rest van de lijst over te slaan.
 
 Na afloop (of na stoppen) staat er een verzendrapport (.csv) naast je brondbestand, met per
 ontvanger of de mail is aangekomen.
+
+Ging er iets mis bij een paar docenten? Dan verschijnt de knop "Mislukte opnieuw (N)". Daarmee
+probeer je alleen die mensen nog een keer, zonder een nieuw bestand te maken.
+
+Stuur je dezelfde mail kort na elkaar nog eens, dan waarschuwt de app: "deze mail is de
+afgelopen 14 dagen al naar X van deze Y ontvangers gestuurd". Zo voorkom je dubbele mail.
+Daarvoor onthoudt de app alleen een onleesbare vingerafdruk van de adressen, geen ledenlijst.
+
+Bij het inplannen kun je alleen doordeweekse dagen aanklikken die nog niet geweest zijn —
+weekenden en verlopen datums zijn doorgestreept.
 
 Zelf een sjabloon toevoegen
 -----------------------------

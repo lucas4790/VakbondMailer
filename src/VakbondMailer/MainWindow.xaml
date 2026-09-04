@@ -66,9 +66,13 @@
                             <TextBlock Text="01" Style="{StaticResource EyebrowText}"/>
                             <TextBlock Text="Ledenlijst" Style="{StaticResource SectionHeaderText}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Style="{StaticResource PillBorder}">
-                            <TextBlock x:Name="RecipientCountText" Text="Geen lijst geladen" Style="{StaticResource PillText}"/>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="SelectAllButton" Content="Alles aan" Style="{StaticResource GhostButton}" Click="SelectAllButton_Click"/>
+                            <Button x:Name="SelectNoneButton" Content="Alles uit" Style="{StaticResource GhostButton}" Click="SelectNoneButton_Click"/>
+                            <Border Style="{StaticResource PillBorder}" Margin="8,0,0,0">
+                                <TextBlock x:Name="RecipientCountText" Text="Geen lijst geladen" Style="{StaticResource PillText}"/>
+                            </Border>
+                        </StackPanel>
                     </Grid>
 
                     <Grid Margin="0,0,0,16">
@@ -92,7 +96,8 @@
 
                     <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
                         <DataGrid x:Name="PreviewDataGrid"
-                                  AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  AutoGenerateColumns="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  AutoGeneratingColumn="PreviewDataGrid_AutoGeneratingColumn"
                                   CanUserResizeRows="False" HeadersVisibility="Column" RowHeaderWidth="0"
                                   BorderThickness="0" Background="{StaticResource PaperRaisedBrush}"
                                   GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource LineBrush}"
@@ -276,6 +281,7 @@
                         <Button x:Name="SendTestButton" Content="Stuur testmail" Click="SendTestButton_Click"/>
                         <Button x:Name="SendAllButton" Content="Verstuur naar iedereen" Style="{StaticResource PrimaryButton}" Click="SendAllButton_Click" Margin="10,0,0,0"/>
                         <Button x:Name="CancelSendButton" Content="Stoppen" Click="CancelSendButton_Click" Margin="10,0,0,0" Visibility="Collapsed"/>
+                        <Button x:Name="RetryFailedButton" Content="Mislukte opnieuw" Click="RetryFailedButton_Click" Margin="10,0,0,0" Visibility="Collapsed"/>
                     </StackPanel>
 
                     <ProgressBar x:Name="SendProgressBar" Style="{StaticResource ThinProgressBar}" Margin="0,0,0,8"/>
