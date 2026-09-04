@@ -189,6 +189,20 @@
                         <TextBlock Text="Versturen" Style="{StaticResource SectionHeaderText}"/>
                     </StackPanel>
 
+                    <StackPanel Margin="0,0,0,14">
+                        <TextBlock Text="VERZENDEN VANAF" Style="{StaticResource FieldLabelText}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="280"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AccountComboBox" Grid.Column="0"/>
+                            <Button x:Name="RefreshAccountsButton" Grid.Column="2" Content="Accounts vernieuwen"
+                                    Style="{StaticResource GhostButton}" Click="RefreshAccountsButton_Click"/>
+                        </Grid>
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <Button x:Name="SendTestButton" Content="Stuur testmail naar mezelf" Click="SendTestButton_Click"/>
                         <Button x:Name="SendAllButton" Content="Verstuur naar iedereen" Style="{StaticResource PrimaryButton}" Click="SendAllButton_Click" Margin="10,0,0,0"/>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace VakbondMailer.Services;
@@ -25,7 +26,11 @@ public sealed class OutlookMailService
     [DllImport("oleaut32.dll", PreserveSig = false)]
     private static extern void GetActiveObject(ref Guid rclsid, IntPtr reserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
 
-    public void SendMail(string toEmail, string subject, string body)
+    /// <param name="accountName">
+    /// Weergavenaam van het Outlook-account waarmee verstuurd moet worden (uit <see cref="GetAccountNames"/>).
+    /// Bij null/leeg wordt Outlook's eigen standaardaccount gebruikt.
+    /// </param>
+    public void SendMail(string toEmail, string subject, string body, string? accountName = null)
     {
         dynamic outlookApp = GetOrCreateOutlookApplication();
         dynamic mailItem = outlookApp.CreateItem(OlMailItem);
@@ -34,6 +39,14 @@ public sealed class OutlookMailService
             mailItem.To = toEmail;
             mailItem.Subject = subject;
             mailItem.Body = body;
+
+            if (!string.IsNullOrWhiteSpace(accountName))
+            {
+                var account = FindAccount(outlookApp, accountName);
+                if (account is not null)
+                    mailItem.SendUsingAccount = account;
+            }
+
             mailItem.Send();
         }
         finally
@@ -42,12 +55,61 @@ public sealed class OutlookMailService
         }
     }
 
-    public string GetCurrentUserEmail()
+    /// <summary>
+    /// Weergavenamen van alle mailaccounts die in deze Outlook-installatie zijn geconfigureerd,
+    /// zodat de gebruiker kan kiezen vanaf welk account verstuurd wordt.
+    /// </summary>
+    public IReadOnlyList<string> GetAccountNames()
     {
         dynamic outlookApp = GetOrCreateOutlookApplication();
         dynamic session = outlookApp.Session;
         try
         {
+            var names = new List<string>();
+            dynamic accounts = session.Accounts;
+            int count = accounts.Count;
+            for (var i = 1; i <= count; i++)
+            {
+                dynamic account = accounts[i];
+                names.Add((string)account.DisplayName);
+            }
+
+            return names;
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(session);
+        }
+    }
+
+    /// <summary>
+    /// E-mailadres van het opgegeven account (of, bij null/leeg of wanneer het adres niet
+    /// bepaald kan worden, van Outlook's huidige/standaardgebruiker).
+    /// </summary>
+    public string GetAccountEmail(string? accountName = null)
+    {
+        dynamic outlookApp = GetOrCreateOutlookApplication();
+        dynamic session = outlookApp.Session;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(accountName))
+            {
+                var account = FindAccount(outlookApp, accountName);
+                if (account is not null)
+                {
+                    try
+                    {
+                        var smtp = (string)((dynamic)account).SmtpAddress;
+                        if (!string.IsNullOrWhiteSpace(smtp))
+                            return smtp;
+                    }
+                    catch (COMException)
+                    {
+                        // SmtpAddress niet beschikbaar voor dit accounttype; val terug op CurrentUser hieronder.
+                    }
+                }
+            }
+
             dynamic currentUser = session.CurrentUser;
             try
             {
@@ -61,6 +123,28 @@ public sealed class OutlookMailService
             }
 
             return (string)currentUser.Address;
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(session);
+        }
+    }
+
+    private static object? FindAccount(dynamic outlookApp, string accountName)
+    {
+        dynamic session = outlookApp.Session;
+        try
+        {
+            dynamic accounts = session.Accounts;
+            int count = accounts.Count;
+            for (var i = 1; i <= count; i++)
+            {
+                dynamic account = accounts[i];
+                if (string.Equals((string)account.DisplayName, accountName, StringComparison.OrdinalIgnoreCase))
+                    return account;
+            }
+
+            return null;
         }
         finally
         {

@@ -13,6 +13,8 @@ namespace VakbondMailer;
 
 public partial class MainWindow : Window
 {
+    private const string DefaultAccountLabel = "Standaardaccount van Outlook";
+
     private readonly OutlookMailService _outlookService = new();
     private readonly ObservableCollection<LogEntry> _logEntries = new();
 
@@ -22,12 +24,18 @@ public partial class MainWindow : Window
     private TextBox? _lastFocusedTemplateBox;
     private bool _isSending;
 
+    private string? SelectedAccountName =>
+        AccountComboBox.SelectedItem is string name && name != DefaultAccountLabel ? name : null;
+
     public MainWindow()
     {
         InitializeComponent();
         _lastFocusedTemplateBox = BodyTextBox;
         LogItemsControl.ItemsSource = _logEntries;
         UpdateMergedPreview();
+
+        AccountComboBox.ItemsSource = new[] { DefaultAccountLabel };
+        AccountComboBox.SelectedIndex = 0;
 
         var settings = AppSettingsService.Load();
         if (!string.IsNullOrWhiteSpace(settings.TemplatesFolder) && Directory.Exists(settings.TemplatesFolder))
@@ -168,14 +176,15 @@ public partial class MainWindow : Window
         {
             // Outlook-COM-objecten zijn STA-gebonden: bewust op de UI-thread aanroepen
             // (niet via Task.Run) om apartment-threading-problemen te vermijden.
-            var myEmail = _outlookService.GetCurrentUserEmail();
+            var accountName = SelectedAccountName;
+            var myEmail = _outlookService.GetAccountEmail(accountName);
             var sampleRecipient = _imported?.Recipients.FirstOrDefault()
                 ?? new Recipient { Email = myEmail, Fields = new Dictionary<string, string>() };
 
             var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
             var body = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
 
-            _outlookService.SendMail(myEmail, $"[TEST] {subject}", body);
+            _outlookService.SendMail(myEmail, $"[TEST] {subject}", body, accountName);
             await Task.Yield();
 
             LogSend("Testmail (naar mezelf)", myEmail, true);
@@ -227,6 +236,7 @@ public partial class MainWindow : Window
         SendProgressBar.Value = 0;
         _logEntries.Clear();
 
+        var accountName = SelectedAccountName;
         var results = new List<SendResult>();
         for (var i = 0; i < _imported.Recipients.Count; i++)
         {
@@ -238,7 +248,7 @@ public partial class MainWindow : Window
             {
                 // Bewust synchroon op de UI-thread: Outlook-COM-objecten zijn STA-gebonden,
                 // aanroepen vanaf een threadpool-thread (Task.Run) kan RPC_E_WRONG_THREAD geven.
-                _outlookService.SendMail(recipient.Email, subject, body);
+                _outlookService.SendMail(recipient.Email, subject, body, accountName);
                 results.Add(new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true });
                 LogSend(recipient.DisplayName, recipient.Email, true);
             }
@@ -361,6 +371,27 @@ public partial class MainWindow : Window
         return name;
     }
 
+    private void RefreshAccountsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var accounts = _outlookService.GetAccountNames();
+            var items = new List<string> { DefaultAccountLabel };
+            items.AddRange(accounts);
+            AccountComboBox.ItemsSource = items;
+            AccountComboBox.SelectedIndex = 0;
+            Log($"{accounts.Count} account(s) gevonden in Outlook.");
+        }
+        catch (OutlookNotAvailableException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Outlook niet beschikbaar", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Kon accounts niet ophalen:\n{ex.Message}", "Fout", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void SetSendingState(bool sending)
     {
         _isSending = sending;
@@ -368,6 +399,8 @@ public partial class MainWindow : Window
         SendAllButton.IsEnabled = !sending;
         ChooseFileButton.IsEnabled = !sending;
         EmailColumnComboBox.IsEnabled = !sending;
+        AccountComboBox.IsEnabled = !sending;
+        RefreshAccountsButton.IsEnabled = !sending;
     }
 
     private void Log(string message) => AddLogEntry(new LogEntry(NowStamp(), message, null, null));
