@@ -17,6 +17,14 @@ public sealed class OutlookMailService
 {
     private const int OlMailItem = 0;
 
+    // Marshal.GetActiveObject bestaat alleen op .NET Framework; op .NET (Core) moet de
+    // Running Object Table zelf via P/Invoke aangesproken worden.
+    [DllImport("ole32.dll")]
+    private static extern int CLSIDFromProgID([MarshalAs(UnmanagedType.LPWStr)] string lpszProgID, out Guid clsid);
+
+    [DllImport("oleaut32.dll", PreserveSig = false)]
+    private static extern void GetActiveObject(ref Guid rclsid, IntPtr reserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+
     public void SendMail(string toEmail, string subject, string body)
     {
         dynamic outlookApp = GetOrCreateOutlookApplication();
@@ -64,7 +72,7 @@ public sealed class OutlookMailService
     {
         try
         {
-            return Marshal.GetActiveObject("Outlook.Application");
+            return GetRunningOutlookApplication();
         }
         catch (COMException)
         {
@@ -83,5 +91,15 @@ public sealed class OutlookMailService
                     "Kon geen verbinding maken met Outlook. Zorg dat de klassieke Outlook desktop-app (niet 'nieuwe Outlook') open staat en dat je bent ingelogd.", ex);
             }
         }
+    }
+
+    private static object GetRunningOutlookApplication()
+    {
+        var hr = CLSIDFromProgID("Outlook.Application", out var clsid);
+        if (hr != 0)
+            throw new COMException("Outlook.Application is niet geregistreerd op dit systeem.", hr);
+
+        GetActiveObject(ref clsid, IntPtr.Zero, out var instance);
+        return instance;
     }
 }

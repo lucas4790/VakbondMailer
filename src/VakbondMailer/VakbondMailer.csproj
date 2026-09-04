@@ -8,7 +8,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>VakbondMailer</AssemblyName>
     <RootNamespace>VakbondMailer</RootNamespace>
-    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

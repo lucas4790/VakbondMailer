@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Data;
 using System.IO;
 using System.Linq;
@@ -13,6 +14,7 @@ namespace VakbondMailer;
 public partial class MainWindow : Window
 {
     private readonly OutlookMailService _outlookService = new();
+    private readonly ObservableCollection<LogEntry> _logEntries = new();
 
     private string? _currentFilePath;
     private ImportedRecipients? _imported;
@@ -23,6 +25,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _lastFocusedTemplateBox = BodyTextBox;
+        LogItemsControl.ItemsSource = _logEntries;
+        UpdateMergedPreview();
     }
 
     private void ChooseFileButton_Click(object sender, RoutedEventArgs e)
@@ -39,13 +43,14 @@ public partial class MainWindow : Window
         {
             _currentFilePath = dialog.FileName;
             FilePathText.Text = Path.GetFileName(_currentFilePath);
+            FilePathText.Foreground = (System.Windows.Media.Brush)FindResource("InkBrush");
 
             var headers = RecipientImportService.ReadHeaders(_currentFilePath);
             EmailColumnComboBox.ItemsSource = headers;
             var guessed = RecipientImportService.GuessEmailColumn(headers);
             EmailColumnComboBox.SelectedItem = guessed ?? headers.FirstOrDefault();
 
-            PlaceholderComboBox.ItemsSource = headers;
+            RenderPlaceholderChips(headers);
 
             // SelectionChanged op de ComboBox triggert hierna automatisch het inladen.
         }
@@ -99,15 +104,27 @@ public partial class MainWindow : Window
         return table;
     }
 
+    private void RenderPlaceholderChips(IReadOnlyList<string> headers)
+    {
+        PlaceholderPanel.Children.Clear();
+        foreach (var header in headers)
+        {
+            var button = new Button
+            {
+                Content = $"{{{{{header}}}}}",
+                Style = (Style)FindResource("ChipButton"),
+            };
+            button.Click += (_, _) => InsertPlaceholder(header);
+            PlaceholderPanel.Children.Add(button);
+        }
+    }
+
     private void SubjectTextBox_GotFocus(object sender, RoutedEventArgs e) => _lastFocusedTemplateBox = SubjectTextBox;
 
     private void BodyTextBox_GotFocus(object sender, RoutedEventArgs e) => _lastFocusedTemplateBox = BodyTextBox;
 
-    private void InsertPlaceholderButton_Click(object sender, RoutedEventArgs e)
+    private void InsertPlaceholder(string header)
     {
-        if (PlaceholderComboBox.SelectedItem is not string header)
-            return;
-
         var target = _lastFocusedTemplateBox ?? BodyTextBox;
         var placeholder = $"{{{{{header}}}}}";
         var caret = target.CaretIndex;
@@ -123,13 +140,13 @@ public partial class MainWindow : Window
         var sampleRecipient = _imported?.Recipients.FirstOrDefault();
         if (sampleRecipient is null)
         {
-            MergedPreviewTextBox.Text = "(nog geen lijst geladen)";
+            MergedPreviewSubject.Text = "(nog geen lijst geladen)";
+            MergedPreviewBody.Text = "Laad een CSV of Excel-bestand om een echt voorbeeld te zien.";
             return;
         }
 
-        var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
-        var body = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
-        MergedPreviewTextBox.Text = $"Onderwerp: {subject}\n\n{body}";
+        MergedPreviewSubject.Text = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
+        MergedPreviewBody.Text = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
     }
 
     private async void SendTestButton_Click(object sender, RoutedEventArgs e)
@@ -152,7 +169,7 @@ public partial class MainWindow : Window
             _outlookService.SendMail(myEmail, $"[TEST] {subject}", body);
             await Task.Yield();
 
-            Log($"Testmail verstuurd naar {myEmail}");
+            LogSend("Testmail (naar mezelf)", myEmail, true);
             MessageBox.Show(this, $"Testmail verstuurd naar {myEmail}.", "Gelukt",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -199,7 +216,7 @@ public partial class MainWindow : Window
         SetSendingState(true);
         SendProgressBar.Maximum = count;
         SendProgressBar.Value = 0;
-        LogListBox.Items.Clear();
+        _logEntries.Clear();
 
         var results = new List<SendResult>();
         for (var i = 0; i < _imported.Recipients.Count; i++)
@@ -214,7 +231,7 @@ public partial class MainWindow : Window
                 // aanroepen vanaf een threadpool-thread (Task.Run) kan RPC_E_WRONG_THREAD geven.
                 _outlookService.SendMail(recipient.Email, subject, body);
                 results.Add(new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true });
-                Log($"Verstuurd: {recipient.DisplayName} <{recipient.Email}>");
+                LogSend(recipient.DisplayName, recipient.Email, true);
             }
             catch (Exception ex)
             {
@@ -225,7 +242,7 @@ public partial class MainWindow : Window
                     Success = false,
                     Error = ex.Message,
                 });
-                Log($"MISLUKT: {recipient.DisplayName} <{recipient.Email}> - {ex.Message}");
+                LogSend(recipient.DisplayName, recipient.Email, false, ex.Message);
             }
 
             SendProgressBar.Value = i + 1;
@@ -302,10 +319,28 @@ public partial class MainWindow : Window
         EmailColumnComboBox.IsEnabled = !sending;
     }
 
-    private void Log(string message)
+    private void Log(string message) => AddLogEntry(new LogEntry(NowStamp(), message, null, null));
+
+    private void LogSend(string title, string email, bool success, string? error = null)
     {
-        LogListBox.Items.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
-        if (LogListBox.Items.Count > 0)
-            LogListBox.ScrollIntoView(LogListBox.Items[^1]);
+        var detail = success ? email : $"{email} — {error}";
+        AddLogEntry(new LogEntry(NowStamp(), title, detail, success));
+    }
+
+    private void AddLogEntry(LogEntry entry)
+    {
+        _logEntries.Add(entry);
+        LogScrollViewer.ScrollToEnd();
+    }
+
+    private static string NowStamp() => DateTime.Now.ToString("HH:mm:ss");
+
+    private sealed record LogEntry(string Time, string Title, string? Detail, bool? Success)
+    {
+        public bool HasDetail => !string.IsNullOrEmpty(Detail);
+
+        public bool IsSuccess => Success == true;
+
+        public bool IsFailure => Success == false;
     }
 }
