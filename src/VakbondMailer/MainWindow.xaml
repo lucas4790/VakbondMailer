@@ -67,7 +67,7 @@
                             <TextBlock Text="Ledenlijst" Style="{StaticResource SectionHeaderText}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Style="{StaticResource PillBorder}">
-                            <TextBlock x:Name="RecipientCountText" Style="{StaticResource PillText}"/>
+                            <TextBlock x:Name="RecipientCountText" Text="Geen lijst geladen" Style="{StaticResource PillText}"/>
                         </Border>
                     </Grid>
 
