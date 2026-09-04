@@ -1,0 +1,25 @@
+name: Afhankelijkheden controleren
+
+# Kijkt bij een pull request of er pakketten bijkomen met bekende kwetsbaarheden,
+# zodat dat opvalt vóórdat het op main staat.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Broncode ophalen
+        uses: actions/checkout@v4
+
+      - name: Afhankelijkheden beoordelen
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always

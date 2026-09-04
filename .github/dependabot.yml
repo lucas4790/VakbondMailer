@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  # NuGet-pakketten (ClosedXML, CsvHelper, testpakketten).
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      # Testpakketten samen: die horen bij elkaar en scheelt losse PR's.
+      test-pakketten:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+
+  # De actions in de workflows zelf (nu nog op Node 20, dat wordt uitgefaseerd).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"

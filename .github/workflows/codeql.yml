@@ -1,0 +1,42 @@
+name: Code scannen op kwetsbaarheden
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Wekelijks, zodat nieuw ontdekte problemen in bestaande code ook boven komen.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: CodeQL (C#)
+    # Zelfde reden als de bouw-workflow: WPF bouwt alleen op Windows.
+    runs-on: windows-latest
+
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Broncode ophalen
+        uses: actions/checkout@v4
+
+      - name: CodeQL voorbereiden
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: .NET 8 installeren
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Bouwen (CodeQL kijkt mee)
+        run: dotnet build --configuration Release
+
+      - name: Analyseren
+        uses: github/codeql-action/analyze@v3
