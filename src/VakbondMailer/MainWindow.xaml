@@ -197,16 +197,16 @@
                                 <ColumnDefinition Width="12"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="AccountComboBox" Grid.Column="0"/>
+                            <ComboBox x:Name="AccountComboBox" Grid.Column="0" SelectionChanged="AccountComboBox_SelectionChanged"/>
                             <Button x:Name="RefreshAccountsButton" Grid.Column="2" Content="Accounts vernieuwen"
                                     Style="{StaticResource GhostButton}" Click="RefreshAccountsButton_Click"/>
                         </Grid>
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="TESTONTVANGER — LEEG = NAAR MEZELF" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="TESTONTVANGER — STANDAARD HET VERZENDACCOUNT" Style="{StaticResource FieldLabelText}"/>
                         <Border Style="{StaticResource InputChrome}" Width="320" HorizontalAlignment="Left">
-                            <TextBox x:Name="TestRecipientTextBox" Style="{StaticResource BareTextBox}"/>
+                            <TextBox x:Name="TestRecipientTextBox" Style="{StaticResource BareTextBox}" TextChanged="TestRecipientTextBox_TextChanged"/>
                         </Border>
                     </StackPanel>
 

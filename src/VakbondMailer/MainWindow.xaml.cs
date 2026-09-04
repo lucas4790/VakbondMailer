@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private ImportedRecipients? _imported;
     private TextBox? _lastFocusedTemplateBox;
     private bool _isSending;
+    private bool _testRecipientIsCustom;
+    private bool _suppressTestRecipientTracking;
 
     private string? SelectedAccountName =>
         AccountComboBox.SelectedItem is string name && name != DefaultAccountLabel ? name : null;
@@ -430,6 +432,8 @@ public partial class MainWindow : Window
             {
                 Log($"{items.Count} FNV-account(s) gevonden in Outlook.");
             }
+
+            TryAutoFillTestRecipient();
         }
         catch (OutlookNotAvailableException ex)
         {
@@ -439,6 +443,39 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, $"Kon accounts niet ophalen:\n{ex.Message}", "Fout", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void AccountComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => TryAutoFillTestRecipient();
+
+    /// <summary>
+    /// Vult de testontvanger met het e-mailadres van het huidig gekozen verzendaccount, tenzij
+    /// de gebruiker daar zelf al iets anders heeft ingetypt (zie <see cref="TestRecipientTextBox_TextChanged"/>).
+    /// </summary>
+    private void TryAutoFillTestRecipient()
+    {
+        if (_testRecipientIsCustom)
+            return;
+
+        try
+        {
+            var email = _outlookService.GetAccountEmail(SelectedAccountName);
+            _suppressTestRecipientTracking = true;
+            TestRecipientTextBox.Text = email;
+            _suppressTestRecipientTracking = false;
+        }
+        catch
+        {
+            // Outlook nog niet beschikbaar; testontvanger blijft zoals hij is, gebruiker kan hem handmatig invullen.
+        }
+    }
+
+    private void TestRecipientTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressTestRecipientTracking)
+            return;
+
+        // Alleen als "eigen" beschouwen zolang er iets in staat; leegmaken zet 'm terug op automatisch.
+        _testRecipientIsCustom = !string.IsNullOrWhiteSpace(TestRecipientTextBox.Text);
     }
 
     private void SetSendingState(bool sending)
