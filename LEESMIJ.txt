@@ -59,6 +59,19 @@ mail uit de lijst, of typ zelf een onderwerp en tekst. Klik op een veld-knop zoa
 Gebruik je een veld dat niet in je ledenlijst voorkomt (bijvoorbeeld een tikfout), dan
 verschijnt daar een waarschuwing onder de veld-knoppen.
 
+Gastles inplannen
+-------------------
+Boven het onderwerp staat een maandkeuze met een kalender. Kies de maand waarin je een gastles
+wilt geven, en klik eventueel een paar datums aan die je wilt voorstellen. Die vullen deze
+velden, die je net als de kolommen in je mail kunt zetten:
+
+    {{Maand}}         ->  oktober
+    {{MaandJaar}}     ->  oktober 2026
+    {{Datumopties}}   ->  woensdag 7 oktober, dinsdag 13 oktober of maandag 26 oktober
+
+Zo stuur je iedereen dezelfde voorgestelde datums, terwijl de aanhef per docent persoonlijk
+blijft. Het sjabloon "Gastles inplannen" laat zien hoe dat eruitziet.
+
 Optioneel:
 - Vink "Opmaak herkennen" aan om **vet**, *cursief* en kale links (https://...) automatisch
   om te zetten naar opgemaakte tekst in de verstuurde mail.

@@ -6,12 +6,23 @@ namespace VakbondMailer.Services;
 
 public static partial class TemplateRenderer
 {
-    public static string Render(string template, Recipient recipient)
+    /// <param name="extraFields">
+    /// Velden die niet uit de ledenlijst komen (zie <see cref="PlanningFields"/>). Kolommen uit
+    /// de ledenlijst gaan voor: die zijn immers per ontvanger ingevuld.
+    /// </param>
+    public static string Render(string template, Recipient recipient, IReadOnlyDictionary<string, string>? extraFields = null)
     {
         return PlaceholderPattern().Replace(template, match =>
         {
             var key = match.Groups[1].Value.Trim();
-            return recipient.Fields.TryGetValue(key, out var value) ? value : match.Value;
+
+            if (recipient.Fields.TryGetValue(key, out var value))
+                return value;
+
+            if (extraFields is not null && extraFields.TryGetValue(key, out var extra))
+                return extra;
+
+            return match.Value;
         });
     }
 

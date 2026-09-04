@@ -136,6 +136,25 @@
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
+                        <TextBlock Text="GASTLES INPLANNEN — VULT {{Maand}}, {{MaandJaar}} EN {{Datumopties}}" Style="{StaticResource FieldLabelText}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <StackPanel>
+                                <ComboBox x:Name="MonthComboBox" Width="200" DisplayMemberPath="Label"
+                                          SelectionChanged="MonthComboBox_SelectionChanged"/>
+                                <TextBlock x:Name="DateOptionsPreviewText" FontSize="11" TextWrapping="Wrap" Width="200"
+                                           Foreground="{StaticResource InkFaintBrush}" Margin="0,8,0,0"/>
+                                <Button x:Name="ClearDatesButton" Content="Datums wissen" Style="{StaticResource GhostButton}"
+                                        HorizontalAlignment="Left" Margin="0,4,0,0" Click="ClearDatesButton_Click"/>
+                            </StackPanel>
+                            <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8"
+                                    Margin="16,0,0,0" Padding="4">
+                                <Calendar x:Name="ProposalCalendar" SelectionMode="MultipleRange"
+                                          SelectedDatesChanged="ProposalCalendar_SelectedDatesChanged"/>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,14">
                         <TextBlock Text="ONDERWERP" Style="{StaticResource FieldLabelText}"/>
                         <Border Style="{StaticResource InputChrome}">
                             <TextBox x:Name="SubjectTextBox" Style="{StaticResource BareTextBox}" GotFocus="SubjectTextBox_GotFocus" TextChanged="Template_TextChanged"/>

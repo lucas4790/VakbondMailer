@@ -1,0 +1,5 @@
+{
+  "Name": "Gastles inplannen",
+  "Subject": "Gastles FNV inplannen in {{MaandJaar}}",
+  "Body": "Beste {{Voornaam}},\n\nGraag komen we in {{Maand}} bij jullie op {{School}} een gastles verzorgen over werknemersrechten: wat mag je verwachten van een werkgever, en waar kun je terecht als er iets niet klopt?\n\nWij kunnen op {{Datumopties}}. Schikt een van deze datums? Laat het weten met een antwoord op deze mail, dan zetten we het vast.\n\nLukt geen van deze datums, geef dan gerust een paar momenten door die bij jullie beter uitkomen.\n\nMet vriendelijke groet,\nFNV"
+}

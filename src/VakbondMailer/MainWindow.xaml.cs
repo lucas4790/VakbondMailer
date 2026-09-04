@@ -41,6 +41,8 @@ public partial class MainWindow : Window
         _lastFocusedTemplateBox = BodyTextBox;
         LogListBox.ItemsSource = _logEntries;
         AttachmentListControl.ItemsSource = _attachmentPaths;
+        InitializeMonthOptions();
+        RenderPlaceholderChips(Array.Empty<string>());
         UpdateMergedPreview();
 
         AccountComboBox.ItemsSource = new[] { DefaultAccountLabel };
@@ -102,7 +104,7 @@ public partial class MainWindow : Window
         _currentFilePath = null;
         PreviewDataGrid.ItemsSource = null;
         EmailColumnComboBox.ItemsSource = null;
-        PlaceholderPanel.Children.Clear();
+        RenderPlaceholderChips(Array.Empty<string>()); // planningsvelden blijven wel bruikbaar
         RecipientCountText.Text = "Geen lijst geladen";
         FilePathText.Text = "Nog geen bestand geladen";
         FilePathText.Foreground = (System.Windows.Media.Brush)FindResource("InkFaintBrush");
@@ -174,17 +176,75 @@ public partial class MainWindow : Window
     private void RenderPlaceholderChips(IReadOnlyList<string> headers)
     {
         PlaceholderPanel.Children.Clear();
-        foreach (var header in headers)
+
+        // Kolommen uit de ledenlijst, plus de planningsvelden die de app zelf invult.
+        foreach (var field in headers.Concat(PlanningFields.Keys))
         {
             var button = new Button
             {
-                Content = $"{{{{{header}}}}}",
+                Content = $"{{{{{field}}}}}",
                 Style = (Style)FindResource("ChipButton"),
             };
-            button.Click += (_, _) => InsertPlaceholder(header);
+            button.Click += (_, _) => InsertPlaceholder(field);
             PlaceholderPanel.Children.Add(button);
         }
     }
+
+    /// <summary>
+    /// Vult de maandkeuze met de komende twaalf maanden; standaard de volgende maand, want een
+    /// gastles plan je zelden nog voor deze maand in.
+    /// </summary>
+    private void InitializeMonthOptions()
+    {
+        var firstOfThisMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var options = Enumerable.Range(0, 12)
+            .Select(offset => firstOfThisMonth.AddMonths(offset))
+            .Select(month => new MonthOption(month, PlanningFields.FormatMonthYear(month)))
+            .ToList();
+
+        MonthComboBox.ItemsSource = options;
+        MonthComboBox.SelectedIndex = options.Count > 1 ? 1 : 0;
+    }
+
+    private DateTime SelectedMonth =>
+        MonthComboBox.SelectedItem is MonthOption option ? option.Value : DateTime.Today;
+
+    private IReadOnlyDictionary<string, string> CurrentPlanningFields =>
+        PlanningFields.Build(SelectedMonth, ProposalCalendar.SelectedDates.Cast<DateTime>());
+
+    private void MonthComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Datums uit een andere maand horen niet bij dit voorstel, dus die vervallen.
+        ProposalCalendar.SelectedDates.Clear();
+
+        var month = SelectedMonth;
+        ProposalCalendar.DisplayDateStart = month;
+        ProposalCalendar.DisplayDateEnd = month.AddMonths(1).AddDays(-1);
+        ProposalCalendar.DisplayDate = month;
+
+        UpdatePlanningSummary();
+    }
+
+    private void ProposalCalendar_SelectedDatesChanged(object sender, SelectionChangedEventArgs e) => UpdatePlanningSummary();
+
+    private void ClearDatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        ProposalCalendar.SelectedDates.Clear();
+        UpdatePlanningSummary();
+    }
+
+    private void UpdatePlanningSummary()
+    {
+        var dateOptions = PlanningFields.FormatDateOptions(ProposalCalendar.SelectedDates.Cast<DateTime>());
+        DateOptionsPreviewText.Text = string.IsNullOrEmpty(dateOptions)
+            ? "Geen datums gekozen — {{Datumopties}} blijft leeg. Klik datums in de kalender om ze voor te stellen."
+            : $"{{{{Datumopties}}}} wordt: {dateOptions}";
+
+        UpdateMergedPreview();
+        UpdatePlaceholderWarning();
+    }
+
+    private sealed record MonthOption(DateTime Value, string Label);
 
     private void SubjectTextBox_GotFocus(object sender, RoutedEventArgs e) => _lastFocusedTemplateBox = SubjectTextBox;
 
@@ -233,9 +293,10 @@ public partial class MainWindow : Window
             return;
         }
 
+        var planning = CurrentPlanningFields;
         PreviewRecipientLabel.Text = $"Voorbeeld van: {recipient.DisplayName} ({recipient.Email})";
-        MergedPreviewSubject.Text = TemplateRenderer.Render(SubjectTextBox.Text, recipient);
-        MergedPreviewBody.Text = TemplateRenderer.Render(BodyTextBox.Text, recipient);
+        MergedPreviewSubject.Text = TemplateRenderer.Render(SubjectTextBox.Text, recipient, planning);
+        MergedPreviewBody.Text = TemplateRenderer.Render(BodyTextBox.Text, recipient, planning);
     }
 
     /// <summary>
@@ -247,10 +308,12 @@ public partial class MainWindow : Window
         if (_imported is null)
             return Array.Empty<string>();
 
+        var known = _imported.Headers.Concat(PlanningFields.Keys).ToList();
+
         return TemplateRenderer.ExtractPlaceholders(SubjectTextBox.Text)
             .Concat(TemplateRenderer.ExtractPlaceholders(BodyTextBox.Text))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(token => !_imported.Headers.Contains(token, StringComparer.OrdinalIgnoreCase))
+            .Where(token => !known.Contains(token, StringComparer.OrdinalIgnoreCase))
             .ToList();
     }
 
@@ -306,9 +369,10 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var planning = CurrentPlanningFields;
             var isHtml = HtmlFormattingCheckBox.IsChecked == true;
-            var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient);
-            var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient);
+            var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient, planning);
+            var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient, planning);
             var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
 
             _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName, isHtml, attachments);
@@ -402,10 +466,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Onderwerp en tekst één keer vastleggen: als er tijdens het verzenden nog in de
-        // velden getypt wordt, mogen de resterende mails daar niet door veranderen.
+        // Onderwerp, tekst en planning één keer vastleggen: als er tijdens het verzenden nog
+        // iets gewijzigd wordt, mogen de resterende mails daar niet door veranderen.
         var subjectTemplate = SubjectTextBox.Text;
         var bodyTemplate = BodyTextBox.Text;
+        var planning = CurrentPlanningFields;
 
         _sendCts = new CancellationTokenSource();
         var token = _sendCts.Token;
@@ -427,8 +492,8 @@ public partial class MainWindow : Window
             }
 
             var recipient = _imported.Recipients[i];
-            var subject = TemplateRenderer.Render(subjectTemplate, recipient);
-            var renderedBody = TemplateRenderer.Render(bodyTemplate, recipient);
+            var subject = TemplateRenderer.Render(subjectTemplate, recipient, planning);
+            var renderedBody = TemplateRenderer.Render(bodyTemplate, recipient, planning);
             var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
 
             try
