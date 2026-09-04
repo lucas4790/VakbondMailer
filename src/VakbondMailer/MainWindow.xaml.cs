@@ -14,6 +14,7 @@ namespace VakbondMailer;
 public partial class MainWindow : Window
 {
     private const string DefaultAccountLabel = "Standaardaccount van Outlook";
+    private const string RequiredEmailDomain = "@fnv.nl";
 
     private readonly OutlookMailService _outlookService = new();
     private readonly ObservableCollection<LogEntry> _logEntries = new();
@@ -178,6 +179,15 @@ public partial class MainWindow : Window
             // (niet via Task.Run) om apartment-threading-problemen te vermijden.
             var accountName = SelectedAccountName;
             var myEmail = _outlookService.GetAccountEmail(accountName);
+
+            if (!IsFnvAddress(myEmail))
+            {
+                MessageBox.Show(this,
+                    $"Dit account ({myEmail}) is geen FNV-adres. Kies via 'Accounts vernieuwen' een account dat eindigt op {RequiredEmailDomain}.",
+                    "Alleen FNV-adressen toegestaan", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var sampleRecipient = _imported?.Recipients.FirstOrDefault()
                 ?? new Recipient { Email = myEmail, Fields = new Dictionary<string, string>() };
 
@@ -224,9 +234,29 @@ public partial class MainWindow : Window
             return;
         }
 
+        var accountName = SelectedAccountName;
+        string senderEmail;
+        try
+        {
+            senderEmail = _outlookService.GetAccountEmail(accountName);
+        }
+        catch (OutlookNotAvailableException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Outlook niet beschikbaar", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        if (!IsFnvAddress(senderEmail))
+        {
+            MessageBox.Show(this,
+                $"Dit account ({senderEmail}) is geen FNV-adres. Kies via 'Accounts vernieuwen' een account dat eindigt op {RequiredEmailDomain}.",
+                "Alleen FNV-adressen toegestaan", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         var count = _imported.Recipients.Count;
         var confirm = MessageBox.Show(this,
-            $"Weet je zeker dat je deze mail wilt versturen naar {count} ontvanger(s)?",
+            $"Weet je zeker dat je deze mail wilt versturen naar {count} ontvanger(s), vanaf {senderEmail}?",
             "Bevestig verzenden", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes)
             return;
@@ -236,7 +266,6 @@ public partial class MainWindow : Window
         SendProgressBar.Value = 0;
         _logEntries.Clear();
 
-        var accountName = SelectedAccountName;
         var results = new List<SendResult>();
         for (var i = 0; i < _imported.Recipients.Count; i++)
         {
@@ -375,12 +404,28 @@ public partial class MainWindow : Window
     {
         try
         {
-            var accounts = _outlookService.GetAccountNames();
-            var items = new List<string> { DefaultAccountLabel };
-            items.AddRange(accounts);
+            var accounts = _outlookService.GetAccounts();
+            var fnvAccounts = accounts.Where(a => IsFnvAddress(a.EmailAddress)).ToList();
+
+            var items = new List<string>();
+            var defaultEmail = _outlookService.GetAccountEmail(null);
+            if (IsFnvAddress(defaultEmail))
+                items.Add(DefaultAccountLabel);
+            items.AddRange(fnvAccounts.Select(a => a.DisplayName));
+
             AccountComboBox.ItemsSource = items;
-            AccountComboBox.SelectedIndex = 0;
-            Log($"{accounts.Count} account(s) gevonden in Outlook.");
+            AccountComboBox.SelectedIndex = items.Count > 0 ? 0 : -1;
+
+            if (items.Count == 0)
+            {
+                MessageBox.Show(this,
+                    $"Geen account gevonden dat eindigt op {RequiredEmailDomain}. Voeg je FNV-account toe aan Outlook en klik daarna opnieuw op 'Accounts vernieuwen'.",
+                    "Geen FNV-account gevonden", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                Log($"{items.Count} FNV-account(s) gevonden in Outlook.");
+            }
         }
         catch (OutlookNotAvailableException ex)
         {
@@ -418,6 +463,9 @@ public partial class MainWindow : Window
     }
 
     private static string NowStamp() => DateTime.Now.ToString("HH:mm:ss");
+
+    private static bool IsFnvAddress(string email) =>
+        !string.IsNullOrWhiteSpace(email) && email.EndsWith(RequiredEmailDomain, StringComparison.OrdinalIgnoreCase);
 
     private sealed record LogEntry(string Time, string Title, string? Detail, bool? Success)
     {

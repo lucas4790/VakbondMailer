@@ -10,6 +10,8 @@ public sealed class OutlookNotAvailableException : Exception
     }
 }
 
+public sealed record OutlookAccount(string DisplayName, string EmailAddress);
+
 /// <summary>
 /// Verstuurt mail via de al-lopende, al-ingelogde klassieke Outlook desktop-app (late-bound COM),
 /// zodat er geen Azure-app-registration of opgeslagen wachtwoord nodig is.
@@ -27,7 +29,7 @@ public sealed class OutlookMailService
     private static extern void GetActiveObject(ref Guid rclsid, IntPtr reserved, [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
 
     /// <param name="accountName">
-    /// Weergavenaam van het Outlook-account waarmee verstuurd moet worden (uit <see cref="GetAccountNames"/>).
+    /// Weergavenaam van het Outlook-account waarmee verstuurd moet worden (uit <see cref="GetAccounts"/>).
     /// Bij null/leeg wordt Outlook's eigen standaardaccount gebruikt.
     /// </param>
     public void SendMail(string toEmail, string subject, string body, string? accountName = null)
@@ -56,25 +58,26 @@ public sealed class OutlookMailService
     }
 
     /// <summary>
-    /// Weergavenamen van alle mailaccounts die in deze Outlook-installatie zijn geconfigureerd,
-    /// zodat de gebruiker kan kiezen vanaf welk account verstuurd wordt.
+    /// Alle mailaccounts die in deze Outlook-installatie zijn geconfigureerd, met naam én
+    /// e-mailadres, zodat de gebruiker (of de app) kan filteren op welk account verstuurd mag worden.
     /// </summary>
-    public IReadOnlyList<string> GetAccountNames()
+    public IReadOnlyList<OutlookAccount> GetAccounts()
     {
         dynamic outlookApp = GetOrCreateOutlookApplication();
         dynamic session = outlookApp.Session;
         try
         {
-            var names = new List<string>();
+            var result = new List<OutlookAccount>();
             dynamic accounts = session.Accounts;
             int count = accounts.Count;
             for (var i = 1; i <= count; i++)
             {
                 dynamic account = accounts[i];
-                names.Add((string)account.DisplayName);
+                string displayName = account.DisplayName;
+                result.Add(new OutlookAccount(displayName, TryGetSmtpAddress(account) ?? string.Empty));
             }
 
-            return names;
+            return result;
         }
         finally
         {
@@ -95,19 +98,9 @@ public sealed class OutlookMailService
             if (!string.IsNullOrWhiteSpace(accountName))
             {
                 var account = FindAccount(outlookApp, accountName);
-                if (account is not null)
-                {
-                    try
-                    {
-                        var smtp = (string)((dynamic)account).SmtpAddress;
-                        if (!string.IsNullOrWhiteSpace(smtp))
-                            return smtp;
-                    }
-                    catch (COMException)
-                    {
-                        // SmtpAddress niet beschikbaar voor dit accounttype; val terug op CurrentUser hieronder.
-                    }
-                }
+                var smtp = account is null ? null : TryGetSmtpAddress(account);
+                if (smtp is not null)
+                    return smtp;
             }
 
             dynamic currentUser = session.CurrentUser;
@@ -149,6 +142,20 @@ public sealed class OutlookMailService
         finally
         {
             Marshal.ReleaseComObject(session);
+        }
+    }
+
+    private static string? TryGetSmtpAddress(dynamic account)
+    {
+        try
+        {
+            string smtp = account.SmtpAddress;
+            return string.IsNullOrWhiteSpace(smtp) ? null : smtp;
+        }
+        catch (COMException)
+        {
+            // SmtpAddress niet beschikbaar voor dit accounttype (bv. sommige POP/IMAP-accounts).
+            return null;
         }
     }
 
