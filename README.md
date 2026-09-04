@@ -8,7 +8,7 @@ geen wachtwoorden in de app, geen hosting — alles blijft op je eigen laptop.
 
 - Windows, met de **klassieke Outlook desktop-app** geïnstalleerd en ingelogd
   (niet de nieuwe "New Outlook"-toggle — die ondersteunt geen automatisering)
-- .NET 8 SDK om te bouwen: https://dotnet.microsoft.com/download
+- .NET 10 SDK om te bouwen: https://dotnet.microsoft.com/download
 
 ## Bouwen en starten (vanaf Windows, PowerShell)
 
