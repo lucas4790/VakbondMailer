@@ -20,10 +20,10 @@ jobs:
       - name: Broncode ophalen
         uses: actions/checkout@v7
 
-      - name: .NET 8 installeren
+      - name: .NET 10 installeren
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Bouwen
         run: dotnet build --configuration Release

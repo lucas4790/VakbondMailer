@@ -95,6 +95,7 @@ public partial class MainWindow
 
         UpdateMergedPreview();
         UpdatePlaceholderWarning();
+        UpdateStepTracker();
     }
 
     private sealed record MonthOption(DateTime Value, string Label);
@@ -117,6 +118,7 @@ public partial class MainWindow
     {
         UpdateMergedPreview();
         UpdatePlaceholderWarning();
+        UpdateStepTracker();
     }
 
     private void PreviewDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateMergedPreview();
@@ -162,11 +164,6 @@ public partial class MainWindow
             $"Onbekend veld: {string.Join(", ", unknown.Select(u => $"{{{{{u}}}}}"))} — komt niet voor als kolom in de ledenlijst.";
         PlaceholderWarningText.Visibility = Visibility.Visible;
     }
-
-    /// <summary>
-    /// De controles die voor elke verzending gelden (welk account, mag dat account, bestaan de
-    /// bijlagen nog) plus wat er per mail ingevuld moet worden. Eén plek, zodat de testmail en
-    /// de echte verzending niet uit elkaar kunnen gaan lopen.
 
     private void ChooseTemplateFolderButton_Click(object sender, RoutedEventArgs e)
     {

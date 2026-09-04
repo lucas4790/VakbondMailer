@@ -37,6 +37,26 @@ public partial class MainWindow : Window
         AccountComboBox.SelectedItem is string name && name != DefaultAccountLabel ? name : null;
 
     /// <summary>
+    /// Zet een vinkje op de stappenbalk zodra een stap af is, zodat die balk iets zegt in plaats
+    /// van alleen versiering te zijn.
+    /// </summary>
+    private void UpdateStepTracker()
+    {
+        MarkStep(StepOneBadgeBorder, StepOneBadge, "1", _selection is { All.Count: > 0 });
+
+        MarkStep(StepTwoBadgeBorder, StepTwoBadge, "2",
+            !string.IsNullOrWhiteSpace(SubjectTextBox.Text) && !string.IsNullOrWhiteSpace(BodyTextBox.Text));
+
+        MarkStep(StepThreeBadgeBorder, StepThreeBadge, "3", _accountsLoaded && AccountComboBox.SelectedItem is not null);
+    }
+
+    private void MarkStep(Border badge, TextBlock label, string nummer, bool klaar)
+    {
+        badge.Background = (System.Windows.Media.Brush)FindResource(klaar ? "GoodBrush" : "AccentBrush");
+        label.Text = klaar ? "\u2713" : nummer;
+    }
+
+    /// <summary>
     /// Laat het venster meegroeien met het scherm: op een grote monitor hoeft er dan veel minder
     /// gescrold te worden tussen de drie stappen. Wel begrensd, want de inhoud staat gecentreerd
     /// en wordt van eindeloze breedte niet beter leesbaar.

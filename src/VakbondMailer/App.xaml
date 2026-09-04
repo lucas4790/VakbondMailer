@@ -1,6 +1,9 @@
+<!-- ThemeMode="Light": de ingebouwde Fluent-theme van WPF, zodat dropdowns, kalender en
+     aanvinkvakjes er hetzelfde uitzien als de rest en niet als Windows-chrome van vroeger. -->
 <Application x:Class="VakbondMailer.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ThemeMode="Light"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
@@ -65,7 +68,16 @@
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource InkSoftBrush}"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- Uitleg onder een veldlabel. Bewust geen hoofdletters: hele zinnen in kapitalen
+             lezen slecht en maken het scherm onrustig. -->
+        <Style x:Key="HelperText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource InkFaintBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
         <!-- ============ Cards ============ -->
@@ -202,11 +214,10 @@
             <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>
         </Style>
 
-        <Style TargetType="ComboBox">
-            <Setter Property="Padding" Value="10,7"/>
+        <!-- Bewust géén eigen ComboBox-stijl: een impliciete stijl hier verdringt de template van
+             de Fluent-theme, en dan komt de oude Windows-chrome terug. -->
+        <Style x:Key="FieldComboBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
             <Setter Property="FontSize" Value="13.5"/>
-            <Setter Property="Background" Value="{StaticResource PaperBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
         </Style>
 
         <!-- ============ DataGrid ============ -->

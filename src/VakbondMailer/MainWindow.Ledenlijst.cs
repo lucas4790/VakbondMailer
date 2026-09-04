@@ -60,6 +60,7 @@ public partial class MainWindow
         _lastFailedRecipients = new List<Recipient>();
         RetryFailedButton.Visibility = Visibility.Collapsed;
         PreviewDataGrid.ItemsSource = null;
+        ShowListOrEmptyHint();
         EmailColumnComboBox.ItemsSource = null;
         RenderPlaceholderChips(Array.Empty<string>()); // planningsvelden blijven wel bruikbaar
         RecipientCountText.Text = "Geen lijst geladen";
@@ -92,6 +93,7 @@ public partial class MainWindow
                     UpdateRecipientCount();
             };
             PreviewDataGrid.ItemsSource = _selection.Table.DefaultView;
+            ShowListOrEmptyHint();
             UpdateRecipientCount();
 
             foreach (var warning in _imported.Warnings)
@@ -113,6 +115,7 @@ public partial class MainWindow
             _imported = null;
             _selection = null;
             PreviewDataGrid.ItemsSource = null;
+            ShowListOrEmptyHint();
             RecipientCountText.Text = "Geen lijst geladen";
             UpdateMergedPreview();
             UpdatePlaceholderWarning();
@@ -161,6 +164,18 @@ public partial class MainWindow
         PreviewDataGrid.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true);
         _selection.SelectOnly(recipients);
         UpdateRecipientCount();
+    }
+
+    /// <summary>
+    /// Zonder lijst een uitnodigende tekst tonen in plaats van een lege tabel, die er anders
+    /// uitziet als een grijze streep van niks.
+    /// </summary>
+    private void ShowListOrEmptyHint()
+    {
+        var heeftLijst = _selection is not null && _selection.All.Count > 0;
+        PreviewDataGrid.Visibility = heeftLijst ? Visibility.Visible : Visibility.Collapsed;
+        EmptyListHint.Visibility = heeftLijst ? Visibility.Collapsed : Visibility.Visible;
+        UpdateStepTracker();
     }
 
     private void UpdateRecipientCount() =>

@@ -7,7 +7,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <!-- Stretch met een MaxWidth: de inhoud groeit mee met het venster tot een breedte die
              nog prettig leest, en blijft daarboven gecentreerd staan. -->
-        <StackPanel MaxWidth="1100" HorizontalAlignment="Stretch" Margin="28">
+        <StackPanel MaxWidth="1280" HorizontalAlignment="Stretch" Margin="28">
 
             <!-- Masthead -->
             <Border BorderBrush="{StaticResource InkBrush}" BorderThickness="0,0,0,2" Padding="0,0,0,18" Margin="0,0,0,22">
@@ -30,7 +30,7 @@
             <UniformGrid Columns="3" Margin="0,0,0,20">
                 <Border Style="{StaticResource TrackerCardBorder}" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
-                        <Border Style="{StaticResource StepBadge}"><TextBlock Text="1" Style="{StaticResource StepBadgeText}"/></Border>
+                        <Border x:Name="StepOneBadgeBorder" Style="{StaticResource StepBadge}"><TextBlock x:Name="StepOneBadge" Text="1" Style="{StaticResource StepBadgeText}"/></Border>
                         <StackPanel Margin="10,0,0,0">
                             <TextBlock Text="Ledenlijst" FontWeight="SemiBold" FontSize="13"/>
                             <TextBlock Text="CSV inladen" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
@@ -39,7 +39,7 @@
                 </Border>
                 <Border Style="{StaticResource TrackerCardBorder}" Margin="4,0,4,0">
                     <StackPanel Orientation="Horizontal">
-                        <Border Style="{StaticResource StepBadge}"><TextBlock Text="2" Style="{StaticResource StepBadgeText}"/></Border>
+                        <Border x:Name="StepTwoBadgeBorder" Style="{StaticResource StepBadge}"><TextBlock x:Name="StepTwoBadge" Text="2" Style="{StaticResource StepBadgeText}"/></Border>
                         <StackPanel Margin="10,0,0,0">
                             <TextBlock Text="Bericht" FontWeight="SemiBold" FontSize="13"/>
                             <TextBlock Text="Sjabloon + velden" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
@@ -48,7 +48,7 @@
                 </Border>
                 <Border Style="{StaticResource TrackerCardBorder}" Margin="8,0,0,0">
                     <StackPanel Orientation="Horizontal">
-                        <Border Style="{StaticResource StepBadge}"><TextBlock Text="3" Style="{StaticResource StepBadgeText}"/></Border>
+                        <Border x:Name="StepThreeBadgeBorder" Style="{StaticResource StepBadge}"><TextBlock x:Name="StepThreeBadge" Text="3" Style="{StaticResource StepBadgeText}"/></Border>
                         <StackPanel Margin="10,0,0,0">
                             <TextBlock Text="Versturen" FontWeight="SemiBold" FontSize="13"/>
                             <TextBlock Text="Testen &amp; verzenden" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
@@ -94,12 +94,20 @@
 
                         <StackPanel Grid.Column="4">
                             <TextBlock Text="E-MAILKOLOM" Style="{StaticResource FieldLabelText}"/>
-                            <ComboBox x:Name="EmailColumnComboBox" SelectionChanged="EmailColumnComboBox_SelectionChanged"/>
+                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="EmailColumnComboBox" SelectionChanged="EmailColumnComboBox_SelectionChanged"/>
                         </StackPanel>
                     </Grid>
 
-                    <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
-                        <DataGrid x:Name="PreviewDataGrid"
+                    <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8"
+                            ClipToBounds="True" MinHeight="132" Background="{StaticResource PaperRaisedBrush}">
+                        <Grid>
+                            <StackPanel x:Name="EmptyListHint" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock Text="Nog geen lijst geladen" HorizontalAlignment="Center"
+                                           FontSize="13.5" Foreground="{StaticResource InkSoftBrush}"/>
+                                <TextBlock Text="Kies hierboven een CSV- of Excel-bestand met de docenten." HorizontalAlignment="Center"
+                                           FontSize="12" Margin="0,4,0,0" Foreground="{StaticResource InkFaintBrush}"/>
+                            </StackPanel>
+                            <DataGrid x:Name="PreviewDataGrid"
                                   AutoGenerateColumns="True" CanUserAddRows="False" CanUserDeleteRows="False"
                                   AutoGeneratingColumn="PreviewDataGrid_AutoGeneratingColumn"
                                   CanUserResizeRows="False" HeadersVisibility="Column" RowHeaderWidth="0"
@@ -111,7 +119,8 @@
                                   AlternationCount="2" SelectionMode="Single" SelectionUnit="FullRow"
                                   CanUserSortColumns="False"
                                   SelectionChanged="PreviewDataGrid_SelectionChanged"
-                                  MaxHeight="230" RowHeight="32"/>
+                                  MaxHeight="230" RowHeight="32" Visibility="Collapsed"/>
+                        </Grid>
                     </Border>
                 </StackPanel>
             </Border>
@@ -125,7 +134,8 @@
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="SJABLONENMAP — STANDAARDMAILS PER ONDERWERP" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="SJABLONENMAP" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="Kies een map met standaardmails per onderwerp." Style="{StaticResource HelperText}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -140,27 +150,41 @@
                             <TextBlock x:Name="TemplateFolderText" Grid.Column="2" Text="Geen map gekozen" VerticalAlignment="Center"
                                        Foreground="{StaticResource InkFaintBrush}" TextTrimming="CharacterEllipsis"/>
 
-                            <ComboBox x:Name="TemplateComboBox" Grid.Column="4" DisplayMemberPath="DisplayName"
+                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="TemplateComboBox" Grid.Column="4" DisplayMemberPath="DisplayName"
                                       SelectionChanged="TemplateComboBox_SelectionChanged"/>
                         </Grid>
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="GASTLES INPLANNEN — VULT {{Maand}}, {{MaandJaar}} EN {{Datumopties}}" Style="{StaticResource FieldLabelText}"/>
-                        <StackPanel Orientation="Horizontal">
-                            <StackPanel>
-                                <ComboBox x:Name="MonthComboBox" Width="200" DisplayMemberPath="Label"
-                                          SelectionChanged="MonthComboBox_SelectionChanged"/>
-                                <TextBlock x:Name="DateOptionsPreviewText" FontSize="11" TextWrapping="Wrap" Width="200"
-                                           Foreground="{StaticResource InkFaintBrush}" Margin="0,8,0,0"/>
-                                <Button x:Name="ClearDatesButton" Content="Datums wissen" Style="{StaticResource GhostButton}"
-                                        HorizontalAlignment="Left" Margin="0,4,0,0" Click="ClearDatesButton_Click"/>
-                            </StackPanel>
+                        <TextBlock Text="GASTLES INPLANNEN" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="Kies een maand en eventueel datums om voor te stellen. Dit vult {{Maand}}, {{MaandJaar}} en {{Datumopties}}." Style="{StaticResource HelperText}"/>
+                        <!-- Maandkeuze bóven de kalender: samen één compact blok, in plaats van een
+                             smalle kolom met witruimte ernaast. -->
+                        <StackPanel HorizontalAlignment="Left">
+                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="MonthComboBox" Width="248"
+                                      HorizontalAlignment="Left" DisplayMemberPath="Label"
+                                      SelectionChanged="MonthComboBox_SelectionChanged"/>
                             <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8"
-                                    Margin="16,0,0,0" Padding="4">
+                                    Margin="0,8,0,0" Padding="4" HorizontalAlignment="Left">
+                                <!-- De kalender van de Fluent-theme is fors; iets verkleinen houdt dit
+                                     blok in verhouding met de rest van de kaart. -->
                                 <Calendar x:Name="ProposalCalendar" SelectionMode="MultipleRange"
-                                          SelectedDatesChanged="ProposalCalendar_SelectedDatesChanged"/>
+                                          SelectedDatesChanged="ProposalCalendar_SelectedDatesChanged">
+                                    <Calendar.LayoutTransform>
+                                        <ScaleTransform ScaleX="0.8" ScaleY="0.8"/>
+                                    </Calendar.LayoutTransform>
+                                </Calendar>
                             </Border>
+                        </StackPanel>
+
+                        <!-- Uitleg en uitkomst onder beide kolommen, zodat er naast de kalender geen
+                             gat overblijft. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <TextBlock x:Name="DateOptionsPreviewText" FontSize="12" TextWrapping="Wrap"
+                                       MaxWidth="760" VerticalAlignment="Center"
+                                       Foreground="{StaticResource InkFaintBrush}"/>
+                            <Button x:Name="ClearDatesButton" Content="Datums wissen" Style="{StaticResource GhostButton}"
+                                    Margin="12,0,0,0" VerticalAlignment="Center" Click="ClearDatesButton_Click"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -172,7 +196,8 @@
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="VELD INVOEGEN — KLIK OM TOE TE VOEGEN OP DE CURSORPOSITIE" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="VELD INVOEGEN" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="Klik een veld om het op de cursorpositie in te voegen." Style="{StaticResource HelperText}"/>
                         <WrapPanel x:Name="PlaceholderPanel"/>
                         <TextBlock x:Name="PlaceholderWarningText" FontSize="12" Foreground="{StaticResource BadBrush}"
                                    Visibility="Collapsed" TextWrapping="Wrap" Margin="0,6,0,0"/>
@@ -195,7 +220,8 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="LIVE VOORBEELD — KLIK EEN RIJ HIERBOVEN OM TE WISSELEN" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="LIVE VOORBEELD" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="Klik een rij in de lijst om een andere ontvanger te bekijken." Style="{StaticResource HelperText}"/>
                             <Border Background="{StaticResource PaperSunkenBrush}" CornerRadius="8" Padding="14" Height="200">
                                 <StackPanel>
                                     <TextBlock x:Name="PreviewRecipientLabel" FontSize="11" Foreground="{StaticResource InkFaintBrush}" Margin="0,0,0,4"/>
@@ -249,14 +275,15 @@
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="VERZENDEN VANAF — ALLEEN @FNV.NL-ADRESSEN" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="VERZENDEN VANAF" Style="{StaticResource FieldLabelText}"/>
+                        <TextBlock Text="Er kan alleen verstuurd worden vanaf een @fnv.nl-adres." Style="{StaticResource HelperText}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="280"/>
                                 <ColumnDefinition Width="12"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="AccountComboBox" Grid.Column="0" SelectionChanged="AccountComboBox_SelectionChanged"/>
+                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="AccountComboBox" Grid.Column="0" SelectionChanged="AccountComboBox_SelectionChanged"/>
                             <Button x:Name="RefreshAccountsButton" Grid.Column="2" Content="Accounts vernieuwen"
                                     Style="{StaticResource GhostButton}" Click="RefreshAccountsButton_Click"/>
                         </Grid>
@@ -264,18 +291,20 @@
 
                     <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="20"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="TESTONTVANGER — STANDAARD HET VERZENDACCOUNT" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="TESTONTVANGER" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="Standaard je eigen verzendaccount." Style="{StaticResource HelperText}"/>
                             <Border Style="{StaticResource InputChrome}" Width="320" HorizontalAlignment="Left">
                                 <TextBox x:Name="TestRecipientTextBox" Style="{StaticResource BareTextBox}" TextChanged="TestRecipientTextBox_TextChanged"/>
                             </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="PAUZE TUSSEN MAILS (SEC.)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="PAUZE (SEC.)" Style="{StaticResource FieldLabelText}"/>
                             <Border Style="{StaticResource InputChrome}" Width="70">
                                 <TextBox x:Name="DelayTextBox" Style="{StaticResource BareTextBox}" Text="1" HorizontalContentAlignment="Center"/>
                             </Border>
@@ -290,11 +319,14 @@
                     </StackPanel>
 
                     <ProgressBar x:Name="SendProgressBar" Style="{StaticResource ThinProgressBar}" Margin="0,0,0,8"/>
-                    <TextBlock x:Name="StatusText" Text="Nog niet verstuurd" FontFamily="Consolas" FontSize="12"
+                    <TextBlock x:Name="StatusText" Text="Nog niet verstuurd" FontSize="12"
                                Foreground="{StaticResource InkFaintBrush}" Margin="0,0,0,16"/>
 
                     <TextBlock Text="LOGBOEK" Style="{StaticResource FieldLabelText}"/>
                     <Border Background="{StaticResource PaperSunkenBrush}" CornerRadius="8" Padding="8">
+                        <Grid>
+                        <TextBlock x:Name="EmptyLogHint" Text="Hier verschijnt tijdens het verzenden per ontvanger of de mail is aangekomen."
+                                   Margin="6" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource InkFaintBrush}"/>
                         <ListBox x:Name="LogListBox" MaxHeight="220" Background="Transparent" BorderThickness="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
@@ -339,6 +371,7 @@
                                     </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                        </Grid>
                     </Border>
                 </StackPanel>
             </Border>

@@ -150,6 +150,7 @@ public partial class MainWindow
         SendProgressBar.Maximum = recipients.Count;
         SendProgressBar.Value = 0;
         _log.Clear();
+        EmptyLogHint.Visibility = Visibility.Visible;
 
         // Bewust op de UI-thread (geen Task.Run): Outlook-COM-objecten zijn STA-gebonden.
         var outcome = await BulkMailSender.SendAsync(
@@ -318,6 +319,7 @@ public partial class MainWindow
             }
 
             TryAutoFillTestRecipient();
+            UpdateStepTracker();
         }
         catch (OutlookNotAvailableException ex)
         {
@@ -406,5 +408,9 @@ public partial class MainWindow
         ShowInLog(_log.AddSend(title, email, success, error));
 
     /// <summary>Laat de nieuwste regel meteen in beeld komen.</summary>
-    private void ShowInLog(LogEntry entry) => LogListBox.ScrollIntoView(entry);
+    private void ShowInLog(LogEntry entry)
+    {
+        EmptyLogHint.Visibility = Visibility.Collapsed;
+        LogListBox.ScrollIntoView(entry);
+    }
 }
