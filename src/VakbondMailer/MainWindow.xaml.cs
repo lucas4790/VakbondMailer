@@ -42,12 +42,17 @@ public partial class MainWindow : Window
     /// </summary>
     private void UpdateStepTracker()
     {
-        MarkStep(StepOneBadgeBorder, StepOneBadge, "1", _selection is { All.Count: > 0 });
+        var heeftLijst = _selection is { All.Count: > 0 };
+        MarkStep(StepOneBadgeBorder, StepOneBadge, "1", heeftLijst);
+        StepOneStatus.Text = heeftLijst ? _selection!.CountLabel : "Nog geen bestand";
 
-        MarkStep(StepTwoBadgeBorder, StepTwoBadge, "2",
-            !string.IsNullOrWhiteSpace(SubjectTextBox.Text) && !string.IsNullOrWhiteSpace(BodyTextBox.Text));
+        var heeftBericht = !string.IsNullOrWhiteSpace(SubjectTextBox.Text) && !string.IsNullOrWhiteSpace(BodyTextBox.Text);
+        MarkStep(StepTwoBadgeBorder, StepTwoBadge, "2", heeftBericht);
+        StepTwoStatus.Text = heeftBericht ? "Onderwerp en tekst ingevuld" : "Nog geen tekst";
 
-        MarkStep(StepThreeBadgeBorder, StepThreeBadge, "3", _accountsLoaded && AccountComboBox.SelectedItem is not null);
+        var heeftAccount = _accountsLoaded && AccountComboBox.SelectedItem is string;
+        MarkStep(StepThreeBadgeBorder, StepThreeBadge, "3", heeftAccount);
+        StepThreeStatus.Text = heeftAccount ? (string)AccountComboBox.SelectedItem : "Nog geen account";
     }
 
     private void MarkStep(Border badge, TextBlock label, string nummer, bool klaar)

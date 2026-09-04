@@ -33,7 +33,7 @@
                         <Border x:Name="StepOneBadgeBorder" Style="{StaticResource StepBadge}"><TextBlock x:Name="StepOneBadge" Text="1" Style="{StaticResource StepBadgeText}"/></Border>
                         <StackPanel Margin="10,0,0,0">
                             <TextBlock Text="Ledenlijst" FontWeight="SemiBold" FontSize="13"/>
-                            <TextBlock Text="CSV inladen" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
+                            <TextBlock x:Name="StepOneStatus" Text="Nog geen bestand" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -42,7 +42,7 @@
                         <Border x:Name="StepTwoBadgeBorder" Style="{StaticResource StepBadge}"><TextBlock x:Name="StepTwoBadge" Text="2" Style="{StaticResource StepBadgeText}"/></Border>
                         <StackPanel Margin="10,0,0,0">
                             <TextBlock Text="Bericht" FontWeight="SemiBold" FontSize="13"/>
-                            <TextBlock Text="Sjabloon + velden" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
+                            <TextBlock x:Name="StepTwoStatus" Text="Nog geen tekst" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -51,7 +51,7 @@
                         <Border x:Name="StepThreeBadgeBorder" Style="{StaticResource StepBadge}"><TextBlock x:Name="StepThreeBadge" Text="3" Style="{StaticResource StepBadgeText}"/></Border>
                         <StackPanel Margin="10,0,0,0">
                             <TextBlock Text="Versturen" FontWeight="SemiBold" FontSize="13"/>
-                            <TextBlock Text="Testen &amp; verzenden" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
+                            <TextBlock x:Name="StepThreeStatus" Text="Nog geen account" FontSize="11" Foreground="{StaticResource InkFaintBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -80,21 +80,26 @@
 
                     <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="16"/>
-                            <ColumnDefinition Width="320"/>
-                            <ColumnDefinition Width="16"/>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="2*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Button x:Name="ChooseFileButton" Grid.Column="0" Content="Bestand kiezen..." VerticalAlignment="Center" Click="ChooseFileButton_Click"/>
-                        <TextBlock x:Name="FilePathText" Grid.Column="2" Text="Nog geen bestand geladen" VerticalAlignment="Center"
-                                   Foreground="{StaticResource InkFaintBrush}" TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="BESTAND" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="Een CSV- of Excel-bestand met de docenten." Style="{StaticResource HelperText}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="ChooseFileButton" Content="Bestand kiezen..." Click="ChooseFileButton_Click"/>
+                                <TextBlock x:Name="FilePathText" Text="Nog geen bestand geladen" VerticalAlignment="Center" Margin="16,0,0,0"
+                                           Foreground="{StaticResource InkFaintBrush}" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </StackPanel>
 
-                        <StackPanel Grid.Column="4">
+                        <StackPanel Grid.Column="2">
                             <TextBlock Text="E-MAILKOLOM" Style="{StaticResource FieldLabelText}"/>
-                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="EmailColumnComboBox" SelectionChanged="EmailColumnComboBox_SelectionChanged"/>
+                            <TextBlock Text="De app raadt dit zelf, maar controleer het even." Style="{StaticResource HelperText}"/>
+                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="EmailColumnComboBox"
+                                      SelectionChanged="EmailColumnComboBox_SelectionChanged"/>
                         </StackPanel>
                     </Grid>
 
@@ -133,34 +138,53 @@
                         <TextBlock Text="Bericht" Style="{StaticResource SectionHeaderText}"/>
                     </StackPanel>
 
-                    <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="SJABLONENMAP" Style="{StaticResource FieldLabelText}"/>
-                        <TextBlock Text="Kies een map met standaardmails per onderwerp." Style="{StaticResource HelperText}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="320"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="240"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                    <!-- Twee kolommen: links wat je typt, rechts wat je kiest en ziet. Zo blijft de
+                         rechterhelft van de kaart niet leeg en wordt de pagina een stuk korter. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
 
-                            <Button x:Name="ChooseTemplateFolderButton" Grid.Column="0" Content="Map kiezen..." VerticalAlignment="Center" Click="ChooseTemplateFolderButton_Click"/>
-                            <TextBlock x:Name="TemplateFolderText" Grid.Column="2" Text="Geen map gekozen" VerticalAlignment="Center"
-                                       Foreground="{StaticResource InkFaintBrush}" TextTrimming="CharacterEllipsis"/>
+                        <!-- Linkerkolom: sjabloon kiezen en het bericht schrijven -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="SJABLONENMAP" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="Kies een map met standaardmails per onderwerp." Style="{StaticResource HelperText}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="ChooseTemplateFolderButton" Content="Map kiezen..." Click="ChooseTemplateFolderButton_Click"/>
+                                <TextBlock x:Name="TemplateFolderText" Text="Geen map gekozen" VerticalAlignment="Center" Margin="16,0,0,0"
+                                           Foreground="{StaticResource InkFaintBrush}" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
 
-                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="TemplateComboBox" Grid.Column="4" DisplayMemberPath="DisplayName"
+                            <TextBlock Text="SJABLOON" Style="{StaticResource FieldLabelText}" Margin="0,16,0,4"/>
+                            <ComboBox Style="{StaticResource FieldComboBox}" x:Name="TemplateComboBox" DisplayMemberPath="DisplayName"
                                       SelectionChanged="TemplateComboBox_SelectionChanged"/>
-                        </Grid>
-                    </StackPanel>
 
-                    <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="GASTLES INPLANNEN" Style="{StaticResource FieldLabelText}"/>
-                        <TextBlock Text="Kies een maand en eventueel datums om voor te stellen. Dit vult {{Maand}}, {{MaandJaar}} en {{Datumopties}}." Style="{StaticResource HelperText}"/>
-                        <!-- Maandkeuze bóven de kalender: samen één compact blok, in plaats van een
-                             smalle kolom met witruimte ernaast. -->
-                        <StackPanel HorizontalAlignment="Left">
+                            <TextBlock Text="ONDERWERP" Style="{StaticResource FieldLabelText}" Margin="0,16,0,4"/>
+                            <Border Style="{StaticResource InputChrome}">
+                                <TextBox x:Name="SubjectTextBox" Style="{StaticResource BareTextBox}" GotFocus="SubjectTextBox_GotFocus" TextChanged="Template_TextChanged"/>
+                            </Border>
+
+                            <TextBlock Text="VELD INVOEGEN" Style="{StaticResource FieldLabelText}" Margin="0,16,0,4"/>
+                            <TextBlock Text="Klik een veld om het op de cursorpositie in te voegen." Style="{StaticResource HelperText}"/>
+                            <WrapPanel x:Name="PlaceholderPanel"/>
+                            <TextBlock x:Name="PlaceholderWarningText" FontSize="12" Foreground="{StaticResource BadBrush}"
+                                       Visibility="Collapsed" TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+                            <TextBlock Text="TEKST" Style="{StaticResource FieldLabelText}" Margin="0,16,0,4"/>
+                            <Border Style="{StaticResource InputChrome}">
+                                <TextBox x:Name="BodyTextBox" Style="{StaticResource BareTextBox}" AcceptsReturn="True" TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto" Height="232"
+                                         GotFocus="BodyTextBox_GotFocus" TextChanged="Template_TextChanged"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Rechterkolom: de gastles-planning en het resultaat -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="GASTLES INPLANNEN" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="Kies een maand en eventueel datums om voor te stellen. Dit vult {{Maand}}, {{MaandJaar}} en {{Datumopties}}."
+                                       Style="{StaticResource HelperText}"/>
                             <ComboBox Style="{StaticResource FieldComboBox}" x:Name="MonthComboBox" Width="248"
                                       HorizontalAlignment="Left" DisplayMemberPath="Label"
                                       SelectionChanged="MonthComboBox_SelectionChanged"/>
@@ -175,54 +199,17 @@
                                     </Calendar.LayoutTransform>
                                 </Calendar>
                             </Border>
-                        </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock x:Name="DateOptionsPreviewText" FontSize="12" TextWrapping="Wrap"
+                                           MaxWidth="330" VerticalAlignment="Center"
+                                           Foreground="{StaticResource InkFaintBrush}"/>
+                                <Button x:Name="ClearDatesButton" Content="Datums wissen" Style="{StaticResource GhostButton}"
+                                        Margin="8,0,0,0" VerticalAlignment="Center" Click="ClearDatesButton_Click"/>
+                            </StackPanel>
 
-                        <!-- Uitleg en uitkomst onder beide kolommen, zodat er naast de kalender geen
-                             gat overblijft. -->
-                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                            <TextBlock x:Name="DateOptionsPreviewText" FontSize="12" TextWrapping="Wrap"
-                                       MaxWidth="760" VerticalAlignment="Center"
-                                       Foreground="{StaticResource InkFaintBrush}"/>
-                            <Button x:Name="ClearDatesButton" Content="Datums wissen" Style="{StaticResource GhostButton}"
-                                    Margin="12,0,0,0" VerticalAlignment="Center" Click="ClearDatesButton_Click"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="ONDERWERP" Style="{StaticResource FieldLabelText}"/>
-                        <Border Style="{StaticResource InputChrome}">
-                            <TextBox x:Name="SubjectTextBox" Style="{StaticResource BareTextBox}" GotFocus="SubjectTextBox_GotFocus" TextChanged="Template_TextChanged"/>
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Margin="0,0,0,14">
-                        <TextBlock Text="VELD INVOEGEN" Style="{StaticResource FieldLabelText}"/>
-                        <TextBlock Text="Klik een veld om het op de cursorpositie in te voegen." Style="{StaticResource HelperText}"/>
-                        <WrapPanel x:Name="PlaceholderPanel"/>
-                        <TextBlock x:Name="PlaceholderWarningText" FontSize="12" Foreground="{StaticResource BadBrush}"
-                                   Visibility="Collapsed" TextWrapping="Wrap" Margin="0,6,0,0"/>
-                    </StackPanel>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="18"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="TEKST" Style="{StaticResource FieldLabelText}"/>
-                            <Border Style="{StaticResource InputChrome}">
-                                <TextBox x:Name="BodyTextBox" Style="{StaticResource BareTextBox}" AcceptsReturn="True" TextWrapping="Wrap"
-                                         VerticalScrollBarVisibility="Auto" Height="200"
-                                         GotFocus="BodyTextBox_GotFocus" TextChanged="Template_TextChanged"/>
-                            </Border>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="LIVE VOORBEELD" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Text="LIVE VOORBEELD" Style="{StaticResource FieldLabelText}" Margin="0,20,0,4"/>
                             <TextBlock Text="Klik een rij in de lijst om een andere ontvanger te bekijken." Style="{StaticResource HelperText}"/>
-                            <Border Background="{StaticResource PaperSunkenBrush}" CornerRadius="8" Padding="14" Height="200">
+                            <Border Background="{StaticResource PaperSunkenBrush}" CornerRadius="8" Padding="14" Height="232">
                                 <StackPanel>
                                     <TextBlock x:Name="PreviewRecipientLabel" FontSize="11" Foreground="{StaticResource InkFaintBrush}" Margin="0,0,0,4"/>
                                     <TextBlock x:Name="MergedPreviewSubject" FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
