@@ -44,11 +44,25 @@ Stap 3 — lijst inladen (importeren)
 Klik op "Bestand kiezen..." en kies je ingevulde CSV- of Excel-bestand. Controleer of bij
 "E-mailkolom" de juiste kolom staat — de app raadt dit automatisch, maar check het even.
 
+Rijen zonder (geldig) e-mailadres of met een dubbel adres worden automatisch overgeslagen; je
+krijgt daar een melding van, met details in het logboek onderaan.
+
+Klik in de tabel op een rij om het "Live voorbeeld" bij stap 4 voor die specifieke persoon te
+bekijken — handig om een paar mensen na elkaar te checken voordat je aan iedereen verstuurt.
+
 Stap 4 — mail opstellen
 --------------------------
 Kies bovenin bij "Sjablonenmap" de map "Sjablonen" (uit deze map) en pik een kant-en-klare
 mail uit de lijst, of typ zelf een onderwerp en tekst. Klik op een veld-knop zoals
 {{Voornaam}} om die op de cursorpositie in te voegen.
+
+Gebruik je een veld dat niet in je ledenlijst voorkomt (bijvoorbeeld een tikfout), dan
+verschijnt daar een waarschuwing onder de veld-knoppen.
+
+Optioneel:
+- Vink "Opmaak herkennen" aan om **vet**, *cursief* en kale links (https://...) automatisch
+  om te zetten naar opgemaakte tekst in de verstuurde mail.
+- Onder "Bijlagen" kun je bestanden toevoegen die met elke mail worden meegestuurd.
 
 Stap 5 — account kiezen
 --------------------------
@@ -56,12 +70,17 @@ Klik op "Accounts vernieuwen" en kies het @fnv.nl-account waarmee je wilt verstu
 
 Stap 6 — testen
 ------------------
-Klik op "Stuur testmail naar mezelf" en controleer of de mail er goed uitziet.
+Klik op "Stuur testmail" en controleer of de mail er goed uitziet. Het testadres staat
+standaard op je eigen account, maar je kunt daar ook een ander adres invullen.
 
 Stap 7 — versturen
 ---------------------
-Klik op "Verstuur naar iedereen" en bevestig. Na afloop staat er een verzendrapport (.csv)
-naast je brondbestand, met per ontvanger of de mail is aangekomen.
+Klik op "Verstuur naar iedereen" en bevestig. De app stuurt de mails één voor één, met een
+korte pauze ertussen (in te stellen bij "Pauze tussen mails"). Zie je halverwege een probleem,
+klik dan op "Stoppen" om de rest van de lijst over te slaan.
+
+Na afloop (of na stoppen) staat er een verzendrapport (.csv) naast je brondbestand, met per
+ontvanger of de mail is aangekomen.
 
 Zelf een sjabloon toevoegen
 -----------------------------
