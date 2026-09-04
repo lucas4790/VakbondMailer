@@ -114,6 +114,26 @@
                     </StackPanel>
 
                     <StackPanel Margin="0,0,0,14">
+                        <TextBlock Text="SJABLONENMAP — STANDAARDMAILS PER ONDERWERP" Style="{StaticResource FieldLabelText}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="240"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button x:Name="ChooseTemplateFolderButton" Grid.Column="0" Content="Map kiezen..." VerticalAlignment="Center" Click="ChooseTemplateFolderButton_Click"/>
+                            <TextBlock x:Name="TemplateFolderText" Grid.Column="2" Text="Geen map gekozen" VerticalAlignment="Center"
+                                       Foreground="{StaticResource InkFaintBrush}" TextTrimming="CharacterEllipsis"/>
+
+                            <ComboBox x:Name="TemplateComboBox" Grid.Column="4" DisplayMemberPath="DisplayName"
+                                      SelectionChanged="TemplateComboBox_SelectionChanged"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,0,0,14">
                         <TextBlock Text="ONDERWERP" Style="{StaticResource FieldLabelText}"/>
                         <Border Style="{StaticResource InputChrome}">
                             <TextBox x:Name="SubjectTextBox" Style="{StaticResource BareTextBox}" GotFocus="SubjectTextBox_GotFocus" TextChanged="Template_TextChanged"/>
@@ -156,8 +176,7 @@
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                        <Button x:Name="SaveTemplateButton" Content="Sjabloon opslaan..." Style="{StaticResource GhostButton}" Click="SaveTemplateButton_Click"/>
-                        <Button x:Name="LoadTemplateButton" Content="Sjabloon laden..." Style="{StaticResource GhostButton}" Click="LoadTemplateButton_Click" Margin="4,0,0,0"/>
+                        <Button x:Name="SaveTemplateButton" Content="Opslaan als nieuw sjabloon..." Style="{StaticResource GhostButton}" Click="SaveTemplateButton_Click"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

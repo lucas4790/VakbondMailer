@@ -1,0 +1,5 @@
+{
+  "Name": "Welkom nieuw lid",
+  "Subject": "Welkom bij de vakbond, {{Voornaam}}!",
+  "Body": "Beste {{Voornaam}},\n\nWat fijn dat je lid bent geworden. Als docent bij {{School}} kun je bij ons terecht voor advies, rechtsbijstand en collectieve belangenbehartiging.\n\nHeb je vragen? Antwoord gerust op deze mail.\n\nMet vriendelijke groet,\nHet bestuur"
+}

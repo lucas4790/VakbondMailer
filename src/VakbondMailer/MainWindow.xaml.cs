@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<LogEntry> _logEntries = new();
 
     private string? _currentFilePath;
+    private string? _templatesFolder;
     private ImportedRecipients? _imported;
     private TextBox? _lastFocusedTemplateBox;
     private bool _isSending;
@@ -27,6 +28,14 @@ public partial class MainWindow : Window
         _lastFocusedTemplateBox = BodyTextBox;
         LogItemsControl.ItemsSource = _logEntries;
         UpdateMergedPreview();
+
+        var settings = AppSettingsService.Load();
+        if (!string.IsNullOrWhiteSpace(settings.TemplatesFolder) && Directory.Exists(settings.TemplatesFolder))
+        {
+            _templatesFolder = settings.TemplatesFolder;
+            TemplateFolderText.Text = _templatesFolder;
+            RefreshTemplateList();
+        }
     }
 
     private void ChooseFileButton_Click(object sender, RoutedEventArgs e)
@@ -274,16 +283,69 @@ public partial class MainWindow : Window
             "Verzenden voltooid", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+    private void ChooseTemplateFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            InitialDirectory = _templatesFolder,
+        };
+        if (dialog.ShowDialog(this) != true || dialog.FolderName is not { } folder)
+            return;
+
+        _templatesFolder = folder;
+        TemplateFolderText.Text = folder;
+        TemplateFolderText.Foreground = (System.Windows.Media.Brush)FindResource("InkBrush");
+        AppSettingsService.Save(new AppSettings { TemplatesFolder = folder });
+        RefreshTemplateList();
+    }
+
+    private void RefreshTemplateList()
+    {
+        TemplateComboBox.ItemsSource = _templatesFolder is null
+            ? null
+            : TemplateLibraryService.ListTemplates(_templatesFolder);
+        TemplateComboBox.SelectedIndex = -1;
+    }
+
+    private void TemplateComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TemplateComboBox.SelectedItem is not TemplateSummary summary)
+            return;
+
+        try
+        {
+            var template = TemplateStorageService.Load(summary.FilePath);
+            SubjectTextBox.Text = template.Subject;
+            BodyTextBox.Text = template.Body;
+            Log($"Sjabloon geladen: {summary.DisplayName}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Kon sjabloon niet laden:\n{ex.Message}", "Fout", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void SaveTemplateButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SaveFileDialog { Filter = "Sjabloon (*.json)|*.json", FileName = "standaardmail.json" };
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Sjabloon (*.json)|*.json",
+            FileName = SuggestTemplateFileName(SubjectTextBox.Text),
+            InitialDirectory = _templatesFolder,
+        };
         if (dialog.ShowDialog() != true)
             return;
 
         try
         {
-            TemplateStorageService.Save(dialog.FileName, new MailTemplate { Subject = SubjectTextBox.Text, Body = BodyTextBox.Text });
+            var name = string.IsNullOrWhiteSpace(SubjectTextBox.Text)
+                ? Path.GetFileNameWithoutExtension(dialog.FileName)
+                : SubjectTextBox.Text;
+            TemplateStorageService.Save(dialog.FileName, new MailTemplate { Name = name, Subject = SubjectTextBox.Text, Body = BodyTextBox.Text });
             Log($"Sjabloon opgeslagen: {dialog.FileName}");
+
+            if (_templatesFolder is not null && string.Equals(Path.GetDirectoryName(dialog.FileName), _templatesFolder, StringComparison.OrdinalIgnoreCase))
+                RefreshTemplateList();
         }
         catch (Exception ex)
         {
@@ -291,23 +353,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private void LoadTemplateButton_Click(object sender, RoutedEventArgs e)
+    private static string SuggestTemplateFileName(string subject)
     {
-        var dialog = new OpenFileDialog { Filter = "Sjabloon (*.json)|*.json" };
-        if (dialog.ShowDialog() != true)
-            return;
-
-        try
-        {
-            var template = TemplateStorageService.Load(dialog.FileName);
-            SubjectTextBox.Text = template.Subject;
-            BodyTextBox.Text = template.Body;
-            Log($"Sjabloon geladen: {dialog.FileName}");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, $"Kon sjabloon niet laden:\n{ex.Message}", "Fout", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        var name = string.IsNullOrWhiteSpace(subject) ? "standaardmail" : subject;
+        foreach (var invalid in Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '-');
+        return name;
     }
 
     private void SetSendingState(bool sending)

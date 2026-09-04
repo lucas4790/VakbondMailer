@@ -1,0 +1,5 @@
+{
+  "Name": "Uitnodiging ledenvergadering",
+  "Subject": "Uitnodiging ledenvergadering {{School}}",
+  "Body": "Beste {{Voornaam}},\n\nNamens de vakbond nodigen we je van harte uit voor de ledenvergadering voor docenten van {{School}}.\n\nWe bespreken de laatste stand van zaken rond de cao-onderhandelingen en er is ruimte voor vragen.\n\nMet vriendelijke groet,\nHet bestuur"
+}

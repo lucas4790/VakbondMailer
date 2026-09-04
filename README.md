@@ -28,9 +28,14 @@ dotnet test
 
 1. **Bestand kiezen**: kies een `.csv` of `.xlsx` met in elk geval een kolom met e-mailadressen.
    De app probeert de juiste kolom automatisch te herkennen; corrigeer zo nodig.
-2. **Standaardmail opstellen**: typ onderwerp en tekst, gebruik "Veld invoegen" om een
-   `{{Kolomnaam}}`-placeholder toe te voegen (bv. `{{Voornaam}}`). Onderaan zie je een live
+2. **Standaardmail opstellen**: typ onderwerp en tekst, klik op een veld-chip om een
+   `{{Kolomnaam}}`-placeholder in te voegen (bv. `{{Voornaam}}`). Onderaan zie je een live
    voorbeeld op basis van de eerste rij in de lijst.
+   - **Sjablonenmap**: kies één keer een map (bv. `templates-voorbeeld` in dit project, of een
+     eigen map) met standaardmails over verschillende onderwerpen. Ze verschijnen in de
+     dropdown ernaast; kiezen vult onderwerp en tekst meteen in. "Opslaan als nieuw sjabloon..."
+     zet de huidige mail als nieuw bestand in die map, zodat hij de volgende keer ook in de lijst
+     staat. De gekozen map wordt onthouden voor de volgende keer dat je de app opent.
 3. **Stuur testmail naar mezelf**: verstuurt de gepersonaliseerde mail (op basis van de eerste
    rij) naar je eigen adres, zodat je het resultaat kunt checken voordat je verder gaat.
 4. **Verstuur naar iedereen**: na bevestiging worden de mails één voor één verstuurd via Outlook.
