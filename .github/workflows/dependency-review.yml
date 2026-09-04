@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Broncode ophalen
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Afhankelijkheden beoordelen
         uses: actions/dependency-review-action@v5
