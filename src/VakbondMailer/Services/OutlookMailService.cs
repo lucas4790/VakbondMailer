@@ -13,10 +13,25 @@ public sealed class OutlookNotAvailableException : Exception
 public sealed record OutlookAccount(string DisplayName, string EmailAddress);
 
 /// <summary>
+/// Het versturen zelf, apart van Outlook, zodat de verzendlus getest kan worden zonder
+/// dat er echt mail de deur uitgaat.
+/// </summary>
+public interface IMailSender
+{
+    void SendMail(
+        string toEmail,
+        string subject,
+        string body,
+        string? accountName = null,
+        bool isHtml = false,
+        IReadOnlyList<string>? attachmentPaths = null);
+}
+
+/// <summary>
 /// Verstuurt mail via de al-lopende, al-ingelogde klassieke Outlook desktop-app (late-bound COM),
 /// zodat er geen Azure-app-registration of opgeslagen wachtwoord nodig is.
 /// </summary>
-public sealed class OutlookMailService
+public sealed class OutlookMailService : IMailSender
 {
     private const int OlMailItem = 0;
 

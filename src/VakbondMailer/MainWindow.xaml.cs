@@ -436,6 +436,58 @@ public partial class MainWindow : Window
         PlaceholderWarningText.Visibility = Visibility.Visible;
     }
 
+    /// <summary>
+    /// De controles die voor elke verzending gelden (welk account, mag dat account, bestaan de
+    /// bijlagen nog) plus wat er per mail ingevuld moet worden. Eén plek, zodat de testmail en
+    /// de echte verzending niet uit elkaar kunnen gaan lopen.
+    /// </summary>
+    private bool TryPrepareSend(out BulkSendOptions options, out string senderEmail)
+    {
+        options = null!;
+        senderEmail = string.Empty;
+
+        var accountName = SelectedAccountName;
+        try
+        {
+            senderEmail = _outlookService.GetAccountEmail(accountName);
+        }
+        catch (OutlookNotAvailableException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Outlook niet beschikbaar", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+
+        if (!IsFnvAddress(senderEmail))
+        {
+            MessageBox.Show(this,
+                $"Dit account ({senderEmail}) is geen FNV-adres. Kies via 'Accounts vernieuwen' een account dat eindigt op {RequiredEmailDomain}.",
+                "Alleen FNV-adressen toegestaan", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        var attachments = _attachmentPaths.ToList();
+        var missingAttachment = attachments.FirstOrDefault(path => !File.Exists(path));
+        if (missingAttachment is not null)
+        {
+            MessageBox.Show(this,
+                $"Deze bijlage bestaat niet meer:\n{missingAttachment}\n\nVerwijder hem uit de lijst of kies het bestand opnieuw.",
+                "Bijlage niet gevonden", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        options = new BulkSendOptions
+        {
+            SubjectTemplate = SubjectTextBox.Text,
+            BodyTemplate = BodyTextBox.Text,
+            PlanningFields = CurrentPlanningFields,
+            IsHtml = HtmlFormattingCheckBox.IsChecked == true,
+            AttachmentPaths = attachments,
+            AccountName = accountName,
+            DelayBetweenMails = TimeSpan.FromSeconds(ParseDelaySeconds(DelayTextBox.Text)),
+        };
+        return true;
+    }
+
     private async void SendTestButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isSending)
@@ -446,16 +498,8 @@ public partial class MainWindow : Window
         {
             // Outlook-COM-objecten zijn STA-gebonden: bewust op de UI-thread aanroepen
             // (niet via Task.Run) om apartment-threading-problemen te vermijden.
-            var accountName = SelectedAccountName;
-            var myEmail = _outlookService.GetAccountEmail(accountName);
-
-            if (!IsFnvAddress(myEmail))
-            {
-                MessageBox.Show(this,
-                    $"Dit account ({myEmail}) is geen FNV-adres. Kies via 'Accounts vernieuwen' een account dat eindigt op {RequiredEmailDomain}.",
-                    "Alleen FNV-adressen toegestaan", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!TryPrepareSend(out var options, out var myEmail))
                 return;
-            }
 
             var testRecipient = string.IsNullOrWhiteSpace(TestRecipientTextBox.Text)
                 ? myEmail
@@ -464,23 +508,10 @@ public partial class MainWindow : Window
             var sampleRecipient = GetPreviewRecipient()
                 ?? new Recipient { Email = testRecipient, Fields = new Dictionary<string, string>() };
 
-            var attachments = _attachmentPaths.ToList();
-            var missingAttachment = attachments.FirstOrDefault(path => !File.Exists(path));
-            if (missingAttachment is not null)
-            {
-                MessageBox.Show(this,
-                    $"Deze bijlage bestaat niet meer:\n{missingAttachment}\n\nVerwijder hem uit de lijst of kies het bestand opnieuw.",
-                    "Bijlage niet gevonden", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            var subject = TemplateRenderer.Render(options.SubjectTemplate, sampleRecipient, options.PlanningFields);
+            var body = BulkMailSender.ComposeBody(options, sampleRecipient);
 
-            var planning = CurrentPlanningFields;
-            var isHtml = HtmlFormattingCheckBox.IsChecked == true;
-            var subject = TemplateRenderer.Render(SubjectTextBox.Text, sampleRecipient, planning);
-            var renderedBody = TemplateRenderer.Render(BodyTextBox.Text, sampleRecipient, planning);
-            var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
-
-            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, accountName, isHtml, attachments);
+            _outlookService.SendMail(testRecipient, $"[TEST] {subject}", body, options.AccountName, options.IsHtml, options.AttachmentPaths);
             await Task.Yield();
 
             LogSend("Testmail", testRecipient, true);
@@ -543,25 +574,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var accountName = SelectedAccountName;
-        string senderEmail;
-        try
-        {
-            senderEmail = _outlookService.GetAccountEmail(accountName);
-        }
-        catch (OutlookNotAvailableException ex)
-        {
-            MessageBox.Show(this, ex.Message, "Outlook niet beschikbaar", MessageBoxButton.OK, MessageBoxImage.Error);
+        if (!TryPrepareSend(out var options, out var senderEmail))
             return;
-        }
-
-        if (!IsFnvAddress(senderEmail))
-        {
-            MessageBox.Show(this,
-                $"Dit account ({senderEmail}) is geen FNV-adres. Kies via 'Accounts vernieuwen' een account dat eindigt op {RequiredEmailDomain}.",
-                "Alleen FNV-adressen toegestaan", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
 
         var unknownPlaceholders = FindUnknownPlaceholders();
         if (unknownPlaceholders.Count > 0)
@@ -575,11 +589,10 @@ public partial class MainWindow : Window
         }
 
         var count = recipients.Count;
-        var subjectTemplateForHistory = SubjectTextBox.Text;
 
         var alreadySent = SendHistoryService.CountRecentlySent(
             SendHistoryService.DefaultPath,
-            subjectTemplateForHistory,
+            options.SubjectTemplate,
             recipients.Select(r => r.Email),
             DuplicateSendWindow,
             DateTime.Now);
@@ -599,103 +612,34 @@ public partial class MainWindow : Window
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        var delay = TimeSpan.FromSeconds(ParseDelaySeconds(DelayTextBox.Text));
-        var isHtml = HtmlFormattingCheckBox.IsChecked == true;
-        var attachments = _attachmentPaths.ToList();
-
-        var missingAttachment = attachments.FirstOrDefault(path => !File.Exists(path));
-        if (missingAttachment is not null)
-        {
-            MessageBox.Show(this,
-                $"Deze bijlage bestaat niet meer:\n{missingAttachment}\n\nVerwijder hem uit de lijst of kies het bestand opnieuw.",
-                "Bijlage niet gevonden", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        // Onderwerp, tekst en planning één keer vastleggen: als er tijdens het verzenden nog
-        // iets gewijzigd wordt, mogen de resterende mails daar niet door veranderen.
-        var subjectTemplate = SubjectTextBox.Text;
-        var bodyTemplate = BodyTextBox.Text;
-        var planning = CurrentPlanningFields;
-
         _sendCts = new CancellationTokenSource();
-        var token = _sendCts.Token;
 
         SetSendingState(true, canCancel: true);
         SendProgressBar.Maximum = count;
         SendProgressBar.Value = 0;
         _logEntries.Clear();
 
-        var results = new List<SendResult>();
-        var failedRecipients = new List<Recipient>();
-        var sentEmails = new List<string>();
-        var cancelled = false;
-        for (var i = 0; i < recipients.Count; i++)
-        {
-            if (token.IsCancellationRequested)
-            {
-                cancelled = true;
-                Log($"Verzending gestopt door gebruiker na {i} van {count}.");
-                break;
-            }
+        // Bewust op de UI-thread (geen Task.Run): Outlook-COM-objecten zijn STA-gebonden.
+        var outcome = await BulkMailSender.SendAsync(
+            _outlookService, recipients, options, OnSendProgress, _sendCts.Token);
 
-            var recipient = recipients[i];
-            var subject = TemplateRenderer.Render(subjectTemplate, recipient, planning);
-            var renderedBody = TemplateRenderer.Render(bodyTemplate, recipient, planning);
-            var body = isHtml ? SimpleHtmlFormatter.ToHtml(renderedBody) : renderedBody;
+        if (outcome.Cancelled)
+            Log($"Verzending gestopt door gebruiker na {outcome.Results.Count} van {count}.");
 
-            try
-            {
-                // Bewust synchroon op de UI-thread: Outlook-COM-objecten zijn STA-gebonden,
-                // aanroepen vanaf een threadpool-thread (Task.Run) kan RPC_E_WRONG_THREAD geven.
-                _outlookService.SendMail(recipient.Email, subject, body, accountName, isHtml, attachments);
-                results.Add(new SendResult { Email = recipient.Email, DisplayName = recipient.DisplayName, Success = true });
-                sentEmails.Add(recipient.Email);
-                LogSend(recipient.DisplayName, recipient.Email, true);
-            }
-            catch (Exception ex)
-            {
-                results.Add(new SendResult
-                {
-                    Email = recipient.Email,
-                    DisplayName = recipient.DisplayName,
-                    Success = false,
-                    Error = ex.Message,
-                });
-                failedRecipients.Add(recipient);
-                LogSend(recipient.DisplayName, recipient.Email, false, ex.Message);
-            }
-
-            SendProgressBar.Value = i + 1;
-            StatusText.Text = $"{i + 1} / {count} verwerkt";
-
-            if (i < recipients.Count - 1)
-            {
-                try
-                {
-                    await Task.Delay(delay, token);
-                }
-                catch (TaskCanceledException)
-                {
-                    cancelled = true;
-                    Log($"Verzending gestopt door gebruiker na {i + 1} van {count}.");
-                    break;
-                }
-            }
-        }
-
+        var results = outcome.Results;
         var succeeded = results.Count(r => r.Success);
         var failed = results.Count(r => !r.Success);
+        var cancelled = outcome.Cancelled;
 
-        _lastFailedRecipients = failedRecipients;
-        RetryFailedButton.Content = $"Mislukte opnieuw ({failedRecipients.Count})";
-        RetryFailedButton.Visibility = failedRecipients.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _lastFailedRecipients = outcome.Failed.ToList();
+        RetryFailedButton.Content = $"Mislukte opnieuw ({outcome.Failed.Count})";
+        RetryFailedButton.Visibility = outcome.Failed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        if (sentEmails.Count > 0)
+        if (outcome.SentEmails.Count > 0)
         {
             try
             {
-                SendHistoryService.Append(SendHistoryService.DefaultPath, subjectTemplateForHistory, sentEmails, DateTime.Now);
+                SendHistoryService.Append(SendHistoryService.DefaultPath, options.SubjectTemplate, outcome.SentEmails, DateTime.Now);
             }
             catch (Exception ex)
             {
@@ -725,6 +669,13 @@ public partial class MainWindow : Window
             : $"Klaar. {succeeded} verstuurd, {failed} mislukt.\nRapport: {reportPath}";
         MessageBox.Show(this, summary, cancelled ? "Verzending gestopt" : "Verzenden voltooid",
             MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnSendProgress(BulkSendProgress progress)
+    {
+        LogSend(progress.Result.DisplayName, progress.Result.Email, progress.Result.Success, progress.Result.Error);
+        SendProgressBar.Value = progress.Processed;
+        StatusText.Text = $"{progress.Processed} / {progress.Total} verwerkt";
     }
 
     private void CancelSendButton_Click(object sender, RoutedEventArgs e)
