@@ -1,5 +1,13 @@
 Verstuurt een gepersonaliseerde standaardmail naar iedereen in een CSV- of Excel-lijst, via de klassieke Outlook op je eigen computer.
 
+## Nieuw in 1.1.0
+
+- Nieuw uiterlijk: de knoppen, keuzelijsten en de kalender volgen nu de Windows 11-stijl, in de FNV-kleuren
+- Het venster past zich aan je scherm aan, en de inhoud staat in twee kolommen naast elkaar in plaats van onder elkaar
+- De stappenbalk bovenin houdt bij hoe ver je bent: per stap een vinkje en de stand van zaken
+- Lege vakken leggen nu uit wat er hoort te komen, in plaats van leeg te blijven
+- Draait op .NET 10, ondersteund tot november 2028 (installeren hoeft nog steeds niet)
+
 ## Installeren
 
 1. Download de zip hieronder.
