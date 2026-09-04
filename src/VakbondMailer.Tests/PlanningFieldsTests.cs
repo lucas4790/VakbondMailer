@@ -81,4 +81,25 @@ public class PlanningFieldsTests
 
         Assert.Equal("In januari", result);
     }
+
+    [Fact]
+    public void NextMonths_BegintBijDeMaandVanVandaag()
+    {
+        var maanden = PlanningFields.NextMonths(3, new DateTime(2026, 10, 17));
+
+        Assert.Equal(new[]
+        {
+            new DateTime(2026, 10, 1),
+            new DateTime(2026, 11, 1),
+            new DateTime(2026, 12, 1),
+        }, maanden);
+    }
+
+    [Fact]
+    public void NextMonths_LooptNetjesDoorNaarHetVolgendeJaar()
+    {
+        var maanden = PlanningFields.NextMonths(4, new DateTime(2026, 11, 30));
+
+        Assert.Equal(new DateTime(2027, 2, 1), maanden[3]);
+    }
 }

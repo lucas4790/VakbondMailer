@@ -42,6 +42,16 @@ public static class PlanningFields
         };
     }
 
+    /// <summary>
+    /// De eerste dag van de komende <paramref name="count"/> maanden, te beginnen bij de maand
+    /// waar <paramref name="from"/> in valt — de keuzelijst om een gastles in te plannen.
+    /// </summary>
+    public static IReadOnlyList<DateTime> NextMonths(int count, DateTime from)
+    {
+        var firstOfMonth = new DateTime(from.Year, from.Month, 1);
+        return Enumerable.Range(0, count).Select(firstOfMonth.AddMonths).ToList();
+    }
+
     public static IReadOnlyDictionary<string, string> Build(DateTime month, IEnumerable<DateTime> dates) =>
         new Dictionary<string, string>
         {

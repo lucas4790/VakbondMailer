@@ -36,6 +36,24 @@ public static partial class TemplateRenderer
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    /// <summary>
+    /// Velden die in het sjabloon gebruikt worden maar nergens uit ingevuld kunnen worden — vaak
+    /// een tikfout. Die blijven anders letterlijk als {{Voornam}} in de verstuurde mail staan.
+    /// </summary>
+    public static IReadOnlyList<string> FindUnknownPlaceholders(
+        string subject,
+        string body,
+        IEnumerable<string> knownFields)
+    {
+        var known = knownFields.ToList();
+
+        return ExtractPlaceholders(subject)
+            .Concat(ExtractPlaceholders(body))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(token => !known.Contains(token, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     [GeneratedRegex(@"\{\{\s*([^{}]+?)\s*\}\}")]
     private static partial Regex PlaceholderPattern();
 }

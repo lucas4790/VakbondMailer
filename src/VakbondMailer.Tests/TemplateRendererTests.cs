@@ -90,4 +90,31 @@ public class TemplateRendererTests
 
         Assert.Equal("Beste {{Achternaam}}", result);
     }
+
+    [Fact]
+    public void FindUnknownPlaceholders_SignaleertEenTikfout()
+    {
+        var onbekend = TemplateRenderer.FindUnknownPlaceholders(
+            "Beste {{Voornam}}", "Groeten aan {{School}}", new[] { "Voornaam", "School" });
+
+        Assert.Equal(new[] { "Voornam" }, onbekend);
+    }
+
+    [Fact]
+    public void FindUnknownPlaceholders_KijktNaarOnderwerpEnTekstSamen()
+    {
+        var onbekend = TemplateRenderer.FindUnknownPlaceholders(
+            "In {{Maand}}", "Beste {{Voornaam}}, tot {{Datum}}", new[] { "Voornaam", "Maand" });
+
+        Assert.Equal(new[] { "Datum" }, onbekend);
+    }
+
+    [Fact]
+    public void FindUnknownPlaceholders_IsHoofdletterongevoelig()
+    {
+        var onbekend = TemplateRenderer.FindUnknownPlaceholders(
+            "Beste {{voornaam}}", string.Empty, new[] { "Voornaam" });
+
+        Assert.Empty(onbekend);
+    }
 }

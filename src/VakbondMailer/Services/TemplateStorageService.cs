@@ -27,4 +27,17 @@ public static class TemplateStorageService
         return JsonSerializer.Deserialize<MailTemplate>(json)
             ?? throw new InvalidOperationException("Kon het sjabloon-bestand niet lezen.");
     }
+
+    /// <summary>
+    /// Een bestandsnaam-voorstel op basis van het onderwerp, met tekens die Windows niet in een
+    /// bestandsnaam toestaat vervangen door een streepje.
+    /// </summary>
+    public static string SuggestFileName(string subject)
+    {
+        var name = string.IsNullOrWhiteSpace(subject) ? "standaardmail" : subject;
+        foreach (var invalid in Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '-');
+
+        return name;
+    }
 }
