@@ -13,7 +13,7 @@ public class BulkMailSenderTests
 
         public FakeMailSender(Func<string, bool>? failFor = null) => _failFor = failFor;
 
-        public List<(string To, string Subject, string Body)> Verstuurd { get; } = new();
+        public List<(string To, string Subject, string Body, string? AccountName, IReadOnlyList<string>? AttachmentPaths)> Verstuurd { get; } = new();
 
         public void SendMail(string toEmail, string subject, string body, string? accountName = null,
             bool isHtml = false, IReadOnlyList<string>? attachmentPaths = null)
@@ -21,7 +21,7 @@ public class BulkMailSenderTests
             if (_failFor?.Invoke(toEmail) == true)
                 throw new InvalidOperationException("Postvak vol");
 
-            Verstuurd.Add((toEmail, subject, body));
+            Verstuurd.Add((toEmail, subject, body, accountName, attachmentPaths));
         }
     }
 
@@ -159,5 +159,56 @@ public class BulkMailSenderTests
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains("<b>belangrijk</b>", sender.Verstuurd[0].Body);
+    }
+
+    [Fact]
+    public async Task SendAsync_GeeftHetGekozenAccountDoorAanElkeOntvanger()
+    {
+        var sender = new FakeMailSender();
+        var opties = new BulkSendOptions
+        {
+            SubjectTemplate = "Gastles",
+            BodyTemplate = "Beste {{Voornaam}}",
+            AccountName = "docent.contact@fnv.nl",
+            DelayBetweenMails = TimeSpan.Zero,
+        };
+        var ontvangers = new[] { Ontvanger("Anne", "anne@school.nl"), Ontvanger("Bram", "bram@school.nl") };
+
+        await BulkMailSender.SendAsync(sender, ontvangers, opties,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.All(sender.Verstuurd, m => Assert.Equal("docent.contact@fnv.nl", m.AccountName));
+    }
+
+    [Fact]
+    public async Task SendAsync_GeeftDeBijlagenDoorAanElkeOntvanger()
+    {
+        var sender = new FakeMailSender();
+        var bijlagen = new[] { @"C:\bijlagen\flyer.pdf", @"C:\bijlagen\planning.xlsx" };
+        var opties = new BulkSendOptions
+        {
+            SubjectTemplate = "Gastles",
+            BodyTemplate = "Beste {{Voornaam}}",
+            AttachmentPaths = bijlagen,
+            DelayBetweenMails = TimeSpan.Zero,
+        };
+        var ontvangers = new[] { Ontvanger("Anne", "anne@school.nl"), Ontvanger("Bram", "bram@school.nl") };
+
+        await BulkMailSender.SendAsync(sender, ontvangers, opties,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.All(sender.Verstuurd, m => Assert.Equal(bijlagen, m.AttachmentPaths));
+    }
+
+    [Fact]
+    public async Task SendAsync_GeeftNullDoorWanneerAccountEnBijlagenNietZijnOpgegeven()
+    {
+        var sender = new FakeMailSender();
+
+        await BulkMailSender.SendAsync(sender, new[] { Ontvanger("Anne", "anne@school.nl") }, Opties(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(sender.Verstuurd[0].AccountName);
+        Assert.Null(sender.Verstuurd[0].AttachmentPaths);
     }
 }

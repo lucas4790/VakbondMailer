@@ -71,6 +71,16 @@ waarvan je een voorbeeld ziet, loopt via de index. Daar is eerder een fout in ge
 sorteren werd de verkeerde persoon getoond en getest. Zet sorteren niet terug aan zonder die
 koppeling eerst op identiteit te leggen in plaats van op volgorde.
 
+## `Recipient`-gelijkheid leunt bewust op de identiteit van `Fields`
+
+`Recipient` (en `SendResult`, `BulkSendOptions`, `BulkSendOutcome`) zijn `sealed record` in
+plaats van `sealed class`, voor waardegelijkheid en het gratis meekrijgen van `with`-syntax.
+`Recipient.Fields` is echter een `Dictionary`, en die heeft geen structurele `Equals` — twee
+`Recipient`'s met identieke inhoud maar een andere `Fields`-instantie blijven dus ongelijk. Dat is
+bedoeld: `RecipientSelection.SelectOnly` selecteert ontvangers via `Collection.Contains` op exact
+de `Recipient`-instanties uit de ingelezen lijst, niet op toevallig-gelijke inhoud. Zet `Fields`
+niet om naar een type met structurele gelijkheid zonder `SelectOnly` opnieuw te bekijken.
+
 ## Zelfstandige .exe
 
 `Maak-Uitgave.ps1` publiceert `--self-contained` als single file, zodat de gebruiker niets hoeft

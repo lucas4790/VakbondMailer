@@ -18,9 +18,25 @@ public class SendHistoryServiceTests : IDisposable
     public void CountRecentlySent_IsZeroWithoutHistory()
     {
         var count = SendHistoryService.CountRecentlySent(
-            _path, "Gastles", new[] { "a@school.nl" }, TimeSpan.FromDays(14), DateTime.Now);
+            _path, "Gastles", new[] { "a@school.nl" }, TimeSpan.FromDays(14), new DateTime(2026, 10, 1));
 
         Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public void Load_GeeftLegeLijstTerugAlsBestandNietBestaat()
+    {
+        Assert.Empty(SendHistoryService.Load(_path));
+    }
+
+    [Fact]
+    public void Load_GeeftLegeLijstTerugBijOnleesbareJson()
+    {
+        var directory = Path.GetDirectoryName(_path)!;
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(_path, "dit is geen geldige json");
+
+        Assert.Empty(SendHistoryService.Load(_path));
     }
 
     [Fact]
@@ -74,7 +90,7 @@ public class SendHistoryServiceTests : IDisposable
     [Fact]
     public void Append_DoesNotStoreReadableEmailAddresses()
     {
-        SendHistoryService.Append(_path, "Gastles", new[] { "anne@school.nl" }, DateTime.Now);
+        SendHistoryService.Append(_path, "Gastles", new[] { "anne@school.nl" }, new DateTime(2026, 10, 1));
 
         var contents = File.ReadAllText(_path);
 

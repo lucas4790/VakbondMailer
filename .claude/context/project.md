@@ -41,8 +41,9 @@ liever dat dan een mail met `{{Voornam}}` erin de deur uit.
 
 ## Wat de app achterlaat op schijf
 
-- `verzendrapport_*.csv` naast het bronbestand, per verzending, met per ontvanger de status
-  (UTF-8 **met** BOM, anders maakt Excel er `Ren�` van)
+- `verzendrapport_*.csv` én `verzendrapport_*.xlsx` naast het bronbestand, per verzending, met
+  per ontvanger de status (csv: UTF-8 **met** BOM, anders maakt Excel er `Ren�` van; xlsx: kolom
+  "Status" ook groen/rood gekleurd, voor wie geen csv wil openen)
 - een verzendgeschiedenis in AppData met **gehashte** adressen — genoeg om te waarschuwen "deze
   mailing ging 3 dagen geleden al naar 12 van deze mensen", zonder een ledenlijst achter te laten
 - de laatst gekozen sjablonenmap, in AppData

@@ -235,11 +235,14 @@ public partial class MainWindow
         }
 
         var directory = Path.GetDirectoryName(_currentFilePath) ?? Environment.CurrentDirectory;
-        var reportPath = Path.Combine(directory, $"verzendrapport_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+        var reportBaseName = $"verzendrapport_{DateTime.Now:yyyyMMdd_HHmmss}";
+        var reportPath = Path.Combine(directory, $"{reportBaseName}.csv");
+        var reportXlsxPath = Path.Combine(directory, $"{reportBaseName}.xlsx");
 
         try
         {
             SendReportService.Write(reportPath, outcome.Results);
+            SendReportService.WriteXlsx(reportXlsxPath, outcome.Results);
             Log($"Rapport opgeslagen: {reportPath}");
         }
         catch (Exception ex)

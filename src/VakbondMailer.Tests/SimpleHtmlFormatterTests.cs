@@ -35,7 +35,9 @@ public class SimpleHtmlFormatterTests
         var html = SimpleHtmlFormatter.ToHtml("Salaris < 3000 & > 2000");
 
         Assert.DoesNotContain("< 3000", html);
+        Assert.DoesNotContain("> 2000", html);
         Assert.Contains("&lt; 3000", html);
+        Assert.Contains("&gt; 2000", html);
         Assert.Contains("&amp;", html);
     }
 

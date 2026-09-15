@@ -1,3 +1,4 @@
+using System.Text.Json;
 using VakbondMailer.Services;
 using Xunit;
 
@@ -48,6 +49,38 @@ public class TemplateStorageServiceTests
             Assert.Equal("Gastles inplannen", geladen.Name);
             Assert.Equal("Gastles in {{Maand}}", geladen.Subject);
             Assert.Contains("Tot dan!", geladen.Body);
+        }
+        finally
+        {
+            File.Delete(pad);
+        }
+    }
+
+    [Fact]
+    public void Load_GooitBijOnleesbareJson()
+    {
+        var pad = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(pad, "dit is geen geldige json");
+
+            Assert.ThrowsAny<JsonException>(() => TemplateStorageService.Load(pad));
+        }
+        finally
+        {
+            File.Delete(pad);
+        }
+    }
+
+    [Fact]
+    public void Load_GooitInvalidOperationExceptionBijJsonNull()
+    {
+        var pad = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(pad, "null");
+
+            Assert.Throws<InvalidOperationException>(() => TemplateStorageService.Load(pad));
         }
         finally
         {

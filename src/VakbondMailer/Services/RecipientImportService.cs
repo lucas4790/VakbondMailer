@@ -53,6 +53,19 @@ public static partial class RecipientImportService
     }
 
     /// <summary>
+    /// Best-effort gok naar een naam- en schoolkolom, alleen gebruikt om dezelfde docent met
+    /// twee verschillende e-mailadressen te kunnen signaleren. Ontbreekt een van beide, dan
+    /// slaan we die extra check simpelweg over — de e-mail-duplicate-check blijft dan de enige.
+    /// </summary>
+    private static string? GuessNameColumn(IReadOnlyList<string> headers) =>
+        headers.FirstOrDefault(h =>
+            h.Contains("naam", StringComparison.OrdinalIgnoreCase) ||
+            h.Contains("name", StringComparison.OrdinalIgnoreCase));
+
+    private static string? GuessSchoolColumn(IReadOnlyList<string> headers) =>
+        headers.FirstOrDefault(h => h.Contains("school", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Opent een CSV met de juiste codering: met BOM leest StreamReader die zelf, zonder BOM
     /// proberen we strikt UTF-8 en vallen we terug op Latin1 — dat laatste is wat Excel schrijft
     /// bij "CSV (gescheiden door lijstscheidingstekens)", waar accenten anders onleesbaar worden.
@@ -142,16 +155,19 @@ public static partial class RecipientImportService
         var headers = csv.HeaderRecord?.Select(h => h.Trim()).ToList() ?? new List<string>();
         EnsureUniqueHeaders(headers);
         ValidateEmailColumn(headers, emailColumn);
+        var nameColumn = GuessNameColumn(headers);
+        var schoolColumn = GuessSchoolColumn(headers);
 
         var recipients = new List<Recipient>();
         var warnings = new List<string>();
         var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenNameSchoolCombinations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var rowNumber = 1;
         while (csv.Read())
         {
             rowNumber++;
             var fields = headers.ToDictionary(h => h, h => csv.GetField(h)?.Trim() ?? string.Empty);
-            ProcessRow(fields, emailColumn, rowNumber, recipients, seenEmails, warnings);
+            ProcessRow(fields, emailColumn, nameColumn, schoolColumn, rowNumber, recipients, seenEmails, seenNameSchoolCombinations, warnings);
         }
 
         return new ImportedRecipients { Headers = headers, Recipients = recipients, Warnings = warnings };
@@ -163,10 +179,13 @@ public static partial class RecipientImportService
         var worksheet = workbook.Worksheets.First();
         var headers = GetExcelColumnHeaders(worksheet);
         ValidateEmailColumn(headers, emailColumn);
+        var nameColumn = GuessNameColumn(headers);
+        var schoolColumn = GuessSchoolColumn(headers);
 
         var recipients = new List<Recipient>();
         var warnings = new List<string>();
         var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenNameSchoolCombinations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in worksheet.RowsUsed().Skip(1))
         {
             var fields = new Dictionary<string, string>();
@@ -175,7 +194,7 @@ public static partial class RecipientImportService
                 fields[headers[i]] = row.Cell(i + 1).GetString().Trim();
             }
 
-            ProcessRow(fields, emailColumn, row.RowNumber(), recipients, seenEmails, warnings);
+            ProcessRow(fields, emailColumn, nameColumn, schoolColumn, row.RowNumber(), recipients, seenEmails, seenNameSchoolCombinations, warnings);
         }
 
         return new ImportedRecipients { Headers = headers, Recipients = recipients, Warnings = warnings };
@@ -184,9 +203,12 @@ public static partial class RecipientImportService
     private static void ProcessRow(
         Dictionary<string, string> fields,
         string emailColumn,
+        string? nameColumn,
+        string? schoolColumn,
         int rowNumber,
         List<Recipient> recipients,
         HashSet<string> seenEmails,
+        Dictionary<string, string> seenNameSchoolCombinations,
         List<string> warnings)
     {
         var email = fields[emailColumn];
@@ -208,7 +230,46 @@ public static partial class RecipientImportService
             return;
         }
 
+        WarnIfLikelySamePersonWithDifferentEmail(fields, nameColumn, schoolColumn, email, rowNumber, seenNameSchoolCombinations, warnings);
+
         recipients.Add(new Recipient { Email = email, Fields = fields });
+    }
+
+    /// <summary>
+    /// Vangt de situatie waarin dezelfde docent twee keer in de lijst staat met een ander
+    /// e-mailadres (bv. een tikfout of een oud adres) — anders dan de exacte e-mail-duplicate
+    /// hierboven wordt deze rij wél geïmporteerd, alleen met een waarschuwing erbij.
+    /// </summary>
+    private static void WarnIfLikelySamePersonWithDifferentEmail(
+        Dictionary<string, string> fields,
+        string? nameColumn,
+        string? schoolColumn,
+        string email,
+        int rowNumber,
+        Dictionary<string, string> seenNameSchoolCombinations,
+        List<string> warnings)
+    {
+        if (nameColumn is null || schoolColumn is null)
+            return;
+
+        var name = fields[nameColumn];
+        var school = fields[schoolColumn];
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(school))
+            return;
+
+        var key = $"{name.Trim()}|{school.Trim()}";
+        if (seenNameSchoolCombinations.TryGetValue(key, out var eerderGezienEmail))
+        {
+            if (!string.Equals(eerderGezienEmail, email, StringComparison.OrdinalIgnoreCase))
+            {
+                warnings.Add(
+                    $"Rij {rowNumber}: '{name}' bij '{school}' staat al eerder in de lijst met een ander e-mailadres — controleer of dit niet dezelfde persoon is.");
+            }
+
+            return;
+        }
+
+        seenNameSchoolCombinations[key] = email;
     }
 
     private static bool LooksLikeEmail(string email) => EmailPattern().IsMatch(email);

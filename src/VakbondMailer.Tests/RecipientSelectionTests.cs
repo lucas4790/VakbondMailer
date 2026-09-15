@@ -70,12 +70,35 @@ public class RecipientSelectionTests
     {
         var lijst = Lijst("Anne", "Bram", "Carla");
         var selectie = RecipientSelection.From(lijst);
+        // Dezelfde Recipient-instanties uit lijst.Recipients, dus ook dezelfde Fields-instantie
+        // per ontvanger — dat is waarop SelectOnly's Contains-check hier leunt.
         var mislukt = new[] { lijst.Recipients[1] };
 
         selectie.SelectOnly(mislukt);
 
         Assert.Equal(new[] { "bram@school.nl" }, selectie.Selected.Select(r => r.Email));
         Assert.Equal("1 van 3 geselecteerd", selectie.CountLabel);
+    }
+
+    [Fact]
+    public void SelectOnly_VinktNietAanBijGelijkeInhoudMaarAndereFieldsInstantie()
+    {
+        var lijst = Lijst("Anne", "Bram", "Carla");
+        var selectie = RecipientSelection.From(lijst);
+        var bram = lijst.Recipients[1];
+
+        // Zelfde e-mail en velden, maar een nieuwe Fields-dictionary: door de
+        // instantie-gebonden gelijkheid op Fields (zie .claude/context/beslissingen.md) telt dit
+        // niet als "dezelfde" ontvanger.
+        var kopieMetAndereFieldsInstantie = new Recipient
+        {
+            Email = bram.Email,
+            Fields = new Dictionary<string, string>(bram.Fields),
+        };
+
+        selectie.SelectOnly(new[] { kopieMetAndereFieldsInstantie });
+
+        Assert.Empty(selectie.Selected);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 namespace VakbondMailer.Models;
 
-public sealed class Recipient
+public sealed record Recipient
 {
     public required string Email { get; init; }
 

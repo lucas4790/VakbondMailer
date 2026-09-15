@@ -9,7 +9,7 @@ namespace VakbondMailer.Services;
 /// Wat er per mail ingevuld moet worden. Wordt één keer vastgelegd vóór het verzenden, zodat
 /// wijzigingen in het scherm de lopende verzending niet meer beïnvloeden.
 /// </summary>
-public sealed class BulkSendOptions
+public sealed record BulkSendOptions
 {
     public required string SubjectTemplate { get; init; }
 
@@ -28,7 +28,7 @@ public sealed class BulkSendOptions
 
 public sealed record BulkSendProgress(int Processed, int Total, Recipient Recipient, SendResult Result);
 
-public sealed class BulkSendOutcome
+public sealed record BulkSendOutcome
 {
     public required IReadOnlyList<SendResult> Results { get; init; }
 
