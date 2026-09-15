@@ -1,6 +1,6 @@
 namespace VakbondMailer.Models;
 
-public sealed record SendResult
+public sealed class SendResult
 {
     public required string Email { get; init; }
 

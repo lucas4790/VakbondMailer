@@ -9,6 +9,11 @@ namespace VakbondMailer.Services;
 
 public static class SendReportService
 {
+    private static readonly string[] Headers = ["Naam", "E-mail", "Status", "Foutmelding"];
+
+    private static (string Naam, string Email, string Status, string Foutmelding) ToRow(SendResult result) =>
+        (result.DisplayName, result.Email, result.Success ? "Verstuurd" : "Mislukt", result.Error ?? string.Empty);
+
     public static void Write(string filePath, IEnumerable<SendResult> results)
     {
         // UTF-8 mét BOM: zonder BOM opent Excel de CSV als ANSI en worden namen
@@ -16,18 +21,17 @@ public static class SendReportService
         using var writer = new StreamWriter(filePath, false, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
         using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
 
-        csv.WriteField("Naam");
-        csv.WriteField("E-mail");
-        csv.WriteField("Status");
-        csv.WriteField("Foutmelding");
+        foreach (var header in Headers)
+            csv.WriteField(header);
         csv.NextRecord();
 
         foreach (var result in results)
         {
-            csv.WriteField(result.DisplayName);
-            csv.WriteField(result.Email);
-            csv.WriteField(result.Success ? "Verstuurd" : "Mislukt");
-            csv.WriteField(result.Error ?? string.Empty);
+            var row = ToRow(result);
+            csv.WriteField(row.Naam);
+            csv.WriteField(row.Email);
+            csv.WriteField(row.Status);
+            csv.WriteField(row.Foutmelding);
             csv.NextRecord();
         }
     }
@@ -41,26 +45,25 @@ public static class SendReportService
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Verzendrapport");
 
-        sheet.Cell(1, 1).Value = "Naam";
-        sheet.Cell(1, 2).Value = "E-mail";
-        sheet.Cell(1, 3).Value = "Status";
-        sheet.Cell(1, 4).Value = "Foutmelding";
-        sheet.Range(1, 1, 1, 4).Style.Font.Bold = true;
+        for (var i = 0; i < Headers.Length; i++)
+            sheet.Cell(1, i + 1).Value = Headers[i];
+        sheet.Range(1, 1, 1, Headers.Length).Style.Font.Bold = true;
 
-        var row = 2;
+        var rowIndex = 2;
         foreach (var result in results)
         {
-            sheet.Cell(row, 1).Value = result.DisplayName;
-            sheet.Cell(row, 2).Value = result.Email;
+            var row = ToRow(result);
+            sheet.Cell(rowIndex, 1).Value = row.Naam;
+            sheet.Cell(rowIndex, 2).Value = row.Email;
 
-            var statusCell = sheet.Cell(row, 3);
-            statusCell.Value = result.Success ? "Verstuurd" : "Mislukt";
+            var statusCell = sheet.Cell(rowIndex, 3);
+            statusCell.Value = row.Status;
             statusCell.Style.Fill.BackgroundColor = result.Success
                 ? XLColor.FromArgb(0xC6, 0xEF, 0xCE)
                 : XLColor.FromArgb(0xFF, 0xC7, 0xCE);
 
-            sheet.Cell(row, 4).Value = result.Error ?? string.Empty;
-            row++;
+            sheet.Cell(rowIndex, 4).Value = row.Foutmelding;
+            rowIndex++;
         }
 
         sheet.Columns().AdjustToContents();
